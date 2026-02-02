@@ -579,14 +579,13 @@ export default function Analytics() {
                 </div>
               )}
             </motion.div>
-          </motion.div>
-        </TabsContent>
+          </TabsContent>
 
-        <TabsContent value="security">
-          <SecurityAnalytics />
-        </TabsContent>
-      </Tabs>
-    </div>
+          <TabsContent value="security">
+            <SecurityAnalytics />
+          </TabsContent>
+        </Tabs>
+      </div>
     </DashboardLayout >
   );
 }
