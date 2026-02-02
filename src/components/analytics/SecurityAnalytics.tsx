@@ -2,17 +2,17 @@
 import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Upload, Activity, Trash2, AlertTriangle, Shield, CheckCircle, FileUp } from 'lucide-react';
-import { API_URL } from '../../config';
+import { API_URL } from '@/lib/api';
 
 interface SecurityLog {
-  id: string;
-  email: string;
-  ip_address: string;
-  user_agent: string;
-  created_at: string;
-  input_details: string;
-  attempt_status: string;
-  review_status: string;
+    id: string;
+    email: string;
+    ip_address: string;
+    user_agent: string;
+    created_at: string;
+    input_details: string;
+    attempt_status: string;
+    review_status: string;
 }
 
 export const SecurityAnalytics = () => {
@@ -64,7 +64,7 @@ export const SecurityAnalytics = () => {
     };
 
     const handleDelete = async (id: string) => {
-        if(!confirm('Are you sure you want to delete this log?')) return;
+        if (!confirm('Are you sure you want to delete this log?')) return;
         try {
             const response = await fetch(`${API_URL}/api/security/log/${id}`, {
                 method: 'DELETE',
@@ -91,7 +91,7 @@ export const SecurityAnalytics = () => {
             console.error('Update failed', error);
         }
     };
-    
+
     // Filter logs
     const filteredLogs = logs.filter(log => {
         if (filterStatus === 'all') return true;
@@ -124,11 +124,10 @@ export const SecurityAnalytics = () => {
                         />
                         <label
                             htmlFor="csv-upload"
-                            className={`flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer transition-all duration-300 ${
-                                uploading 
-                                ? 'bg-slate-700 text-slate-400 cursor-not-allowed' 
-                                : 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg hover:shadow-blue-500/25'
-                            }`}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer transition-all duration-300 ${uploading
+                                    ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
+                                    : 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg hover:shadow-blue-500/25'
+                                }`}
                         >
                             {uploading ? <Activity className="animate-spin" size={18} /> : <FileUp size={18} />}
                             {uploading ? 'Importing...' : 'Import CSV'}
@@ -159,7 +158,7 @@ export const SecurityAnalytics = () => {
                         </div>
                     </CardContent>
                 </Card>
-                 <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
+                <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium text-slate-400">Top Threat Source</CardTitle>
                         <Activity className="h-4 w-4 text-red-400" />
@@ -171,10 +170,10 @@ export const SecurityAnalytics = () => {
                     </CardContent>
                 </Card>
             </div>
-            
+
             {/* Filters */}
             <div className="flex gap-2">
-                <select 
+                <select
                     className="p-2 border rounded-lg bg-slate-800 border-slate-700 text-slate-300 focus:ring-2 focus:ring-cyan-500 focus:border-transparent outline-none transition-all"
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value)}
@@ -209,21 +208,19 @@ export const SecurityAnalytics = () => {
                                     <td className="p-4 font-medium text-white">{log.email}</td>
                                     <td className="p-4 font-mono text-sm text-cyan-400">{log.ip_address}</td>
                                     <td className="p-4">
-                                        <span className={`px-2 py-1 rounded-full text-xs font-medium border ${
-                                            log.attempt_status === 'failure' 
-                                            ? 'bg-red-500/10 text-red-400 border-red-500/20' 
-                                            : 'bg-green-500/10 text-green-400 border-green-500/20'
-                                        }`}>
+                                        <span className={`px-2 py-1 rounded-full text-xs font-medium border ${log.attempt_status === 'failure'
+                                                ? 'bg-red-500/10 text-red-400 border-red-500/20'
+                                                : 'bg-green-500/10 text-green-400 border-green-500/20'
+                                            }`}>
                                             {log.attempt_status || 'Unknown'}
                                         </span>
                                     </td>
                                     <td className="p-4">
-                                         <select 
-                                            className={`bg-transparent border rounded px-2 py-1 text-xs font-medium outline-none transition-colors ${
-                                                log.review_status === 'unreviewed' ? 'border-amber-500/50 text-amber-500' :
-                                                log.review_status === 'reviewed' ? 'border-green-500/50 text-green-500' :
-                                                'border-slate-500/50 text-slate-400'
-                                            }`}
+                                        <select
+                                            className={`bg-transparent border rounded px-2 py-1 text-xs font-medium outline-none transition-colors ${log.review_status === 'unreviewed' ? 'border-amber-500/50 text-amber-500' :
+                                                    log.review_status === 'reviewed' ? 'border-green-500/50 text-green-500' :
+                                                        'border-slate-500/50 text-slate-400'
+                                                }`}
                                             value={log.review_status}
                                             onChange={(e) => handleStatusUpdate(log.id, e.target.value)}
                                         >
@@ -233,7 +230,7 @@ export const SecurityAnalytics = () => {
                                         </select>
                                     </td>
                                     <td className="p-4 text-right">
-                                        <button 
+                                        <button
                                             onClick={() => handleDelete(log.id)}
                                             className="p-2 hover:bg-red-500/20 text-slate-400 hover:text-red-400 rounded-lg transition-all"
                                             title="Delete Log"

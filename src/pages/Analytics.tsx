@@ -35,7 +35,7 @@ const COLORS = ['hsl(173, 80%, 40%)', 'hsl(0, 72%, 51%)', 'hsl(38, 92%, 50%)', '
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SecurityAnalytics } from "@/components/analytics/SecurityAnalytics";
-import { API_URL } from '../../config';
+import { API_URL } from '@/lib/api';
 
 export default function Analytics() {
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>('all');
