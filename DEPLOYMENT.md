@@ -2,9 +2,7 @@
 
 This guide provides a complete, step-by-step workflow to deploy Mail Muse to a production Ubuntu server for the domain **`mail.ak-hospitql.com`**.
 
-**IMPORTANT NOTE ON PATHS:**
-This guide assumes your project directory is `/var/www/mail-muse`.
-If your directory is `/var/www/mail-flow`, please replace `mail-muse` with `mail-flow` in all commands below.
+**IMPORTANT:** This guide uses the path `/var/www/mail-flow` as configured on your server.
 
 ## Prerequisites
 - A server running **Ubuntu 24.04** (or 20.04/22.04).
@@ -30,25 +28,22 @@ sudo apt install python3-pip python3-venv nginx git acl -y
 Set up the web directory and ensure your user has permissions.
 
 ```bash
-# Create directory (Change mail-muse to mail-flow if needed)
-sudo mkdir -p /var/www/mail-muse
+# Create directory
+sudo mkdir -p /var/www/mail-flow
 
-# Set permissions (we use www-data since it is the standard web user)
-sudo setfacl -R -m u:www-data:rwx /var/www/mail-muse
-sudo chown -R www-data:www-data /var/www/mail-muse
+# Set permissions to www-data (standard web user)
+sudo setfacl -R -m u:www-data:rwx /var/www/mail-flow
+sudo chown -R www-data:www-data /var/www/mail-flow
 
-cd /var/www/mail-muse
+cd /var/www/mail-flow
 ```
 
-## 3. Clone Repository
+## 3. Code Setup
 
-Clone your project code.
+Clone or copy your project code to this directory.
 
 ```bash
-# Clone the repo (replace with your actual repo URL)
-git clone https://github.com/yourusername/mail-muse.git .
-
-# Create environmental file
+# Assuming code is already present, just ensure env file exists
 cp .env.example .env 2>/dev/null || touch .env
 ```
 
@@ -59,13 +54,13 @@ Configure the Python backend with Gunicorn.
 ```bash
 cd django_server
 
-# 1. Create Virtual Env
+# 1. Create Virtual Env (Start as current user, we will chown later)
 python3 -m venv venv
 source venv/bin/activate
 
 # 2. Install Dependencies
 pip install -r requirements.txt
-# (gunicorn is now in requirements.txt)
+pip install gunicorn
 
 # 3. Configure .env
 nano .env
@@ -83,6 +78,10 @@ ALLOWED_HOSTS=mail.ak-hospitql.com,localhost,127.0.0.1
 # 4. Initialize Database & Static Files
 python manage.py collectstatic --noinput
 python manage.py migrate
+
+# 5. Fix permissions again (crucial after creating venv/files)
+sudo chown -R www-data:www-data /var/www/mail-flow
+sudo chmod -R 775 /var/www/mail-flow
 ```
 
 ## 5. Backend Service (systemd)
@@ -93,7 +92,7 @@ Set up Gunicorn to keep the backend running automatically.
 sudo nano /etc/systemd/system/mail-muse.service
 ```
 
-Paste the following (ensure paths match your actual directory, e.g., `mail-flow` vs `mail-muse`):
+Paste the following:
 
 ```ini
 [Unit]
@@ -103,11 +102,11 @@ After=network.target
 [Service]
 User=www-data
 Group=www-data
-WorkingDirectory=/var/www/mail-muse/django_server
-ExecStart=/var/www/mail-muse/django_server/venv/bin/gunicorn \
+WorkingDirectory=/var/www/mail-flow/django_server
+ExecStart=/var/www/mail-flow/django_server/venv/bin/gunicorn \
           --access-logfile - \
           --workers 3 \
-          --bind unix:/var/www/mail-muse/django_server/mail_muse.sock \
+          --bind unix:/var/www/mail-flow/django_server/mail_muse.sock \
           mail_muse.wsgi:application
 
 [Install]
@@ -117,6 +116,7 @@ WantedBy=multi-user.target
 Start and enable the service:
 
 ```bash
+sudo systemctl daemon-reload
 sudo systemctl start mail-muse
 sudo systemctl enable mail-muse
 ```
@@ -126,7 +126,7 @@ sudo systemctl enable mail-muse
 Build the React frontend.
 
 ```bash
-cd /var/www/mail-muse
+cd /var/www/mail-flow
 
 # Install Node.js (if not installed)
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
@@ -154,7 +154,7 @@ server {
     listen 80;
     server_name mail.ak-hospitql.com;
 
-    root /var/www/mail-muse/dist;
+    root /var/www/mail-flow/dist;
     index index.html;
 
     # Frontend: Serve React App
@@ -165,12 +165,12 @@ server {
     # Backend: Proxy API Requests
     location /api/ {
         include proxy_params;
-        proxy_pass http://unix:/var/www/mail-muse/django_server/mail_muse.sock;
+        proxy_pass http://unix:/var/www/mail-flow/django_server/mail_muse.sock;
     }
 
     # Backend: Serve Admin Static Files
     location /static/ {
-        alias /var/www/mail-muse/django_server/staticfiles/;
+        alias /var/www/mail-flow/django_server/staticfiles/;
     }
 }
 ```
@@ -192,39 +192,35 @@ sudo apt install certbot python3-certbot-nginx -y
 sudo certbot --nginx -d mail.ak-hospitql.com
 ```
 
-## 9. Firewall Setup
-
-Ensure your firewall allows web traffic.
-
-```bash
-sudo ufw allow 'Nginx Full'
-sudo ufw enable
-```
-
 ---
 
 ## 🔧 Troubleshooting
 
-### 500 Internal Server Error
-This is usually a **Permission Issue** with the database.
-If you ran commands as `root`, the `db.sqlite3` file is owned by root, but the web server (Gunicorn) runs as `ubuntu` or `www-data`.
+### Status 203/EXEC
+This means the **Gunicorn executable cannot be found** at the path specified in the service file.
 
 **Fix:**
-Reset ownership of the entire project directory:
+1. Check if the file exists:
+   ```bash
+   ls -l /var/www/mail-flow/django_server/venv/bin/gunicorn
+   ```
+2. If it says "No such file", install it:
+   ```bash
+   cd /var/www/mail-flow/django_server
+   source venv/bin/activate
+   pip install gunicorn
+   ```
+3. Restart the service:
+   ```bash
+   sudo systemctl restart mail-muse
+   ```
+
+### 500 Internal Server Error
+This is usually a **Permission Issue** with the SQLite database.
+
+**Fix:**
 ```bash
-# Replace /var/www/mail-muse with your actual path (e.g., /var/www/mail-flow)
-sudo chown -R www-data:www-data /var/www/mail-muse
-sudo chmod -R 775 /var/www/mail-muse
+sudo chown -R www-data:www-data /var/www/mail-flow
+sudo chmod -R 775 /var/www/mail-flow
 sudo systemctl restart mail-muse
-```
-
-### Check Logs
-Backend logs:
-```bash
-sudo journalctl -u mail-muse -f
-```
-
-Nginx error logs:
-```bash
-sudo tail -f /var/log/nginx/error.log
 ```
