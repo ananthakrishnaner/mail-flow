@@ -1,238 +1,259 @@
 
-import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Upload, Shield, AlertTriangle, Search, FileText } from "lucide-react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import api from "@/lib/api";
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table";
-import {
-    BarChart,
-    Bar,
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Tooltip,
-    ResponsiveContainer,
-    Cell
-} from 'recharts';
-import { format } from "date-fns";
-import { useToast } from "@/components/ui/use-toast";
+import { useState, useEffect } from 'react';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Upload, Activity, Trash2, AlertTriangle, Shield, CheckCircle, FileUp } from 'lucide-react';
+import { API_URL } from '../../config';
 
 interface SecurityLog {
-    id: string;
-    email: string;
-    ip_address: string;
-    user_agent: string;
-    created_at: string;
-    input_details: string;
+  id: string;
+  email: string;
+  ip_address: string;
+  user_agent: string;
+  created_at: string;
+  input_details: string;
+  attempt_status: string;
+  review_status: string;
 }
 
-interface SecurityStats {
-    top_ips: { ip_address: string; count: number }[];
-    recent_logs: SecurityLog[];
-}
+export const SecurityAnalytics = () => {
+    const [logs, setLogs] = useState<SecurityLog[]>([]);
+    const [uploading, setUploading] = useState(false);
+    const [filterStatus, setFilterStatus] = useState<string>('all');
+    const [stats, setStats] = useState<any>(null);
 
-export function SecurityAnalytics() {
-    const [file, setFile] = useState<File | null>(null);
-    const [isUploading, setIsUploading] = useState(false);
-    const { toast } = useToast();
-    const queryClient = useQueryClient();
-
-    const { data: stats, isLoading } = useQuery({
-        queryKey: ["security-stats"],
-        queryFn: async () => {
-            const response = await api.get("/security/stats");
-            return response.data as SecurityStats;
-        },
-    });
-
-    const uploadMutation = useMutation({
-        mutationFn: async (file: File) => {
-            const formData = new FormData();
-            formData.append("file", file);
-            await api.post("/security/import", formData, {
-                headers: {
-                    "Content-Type": "multipart/form-data",
-                },
-            });
-        },
-        onSuccess: () => {
-            toast({
-                title: "Success",
-                description: "Security logs imported successfully",
-            });
-            setFile(null);
-            queryClient.invalidateQueries({ queryKey: ["security-stats"] });
-        },
-        onError: () => {
-            toast({
-                title: "Error",
-                description: "Failed to import logs",
-                variant: "destructive",
-            });
-        },
-        onSettled: () => {
-            setIsUploading(false);
-        }
-    });
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            setFile(e.target.files[0]);
+    const fetchStats = async () => {
+        try {
+            const res = await fetch(`${API_URL}/api/security/stats`);
+            const data = await res.json();
+            setLogs(data.recent_logs);
+            setStats(data);
+        } catch (error) {
+            console.error('Fetch stats failed', error);
         }
     };
 
-    const handleUpload = () => {
-        if (file) {
-            setIsUploading(true);
-            uploadMutation.mutate(file);
+    useEffect(() => {
+        fetchStats();
+    }, []);
+
+    const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        setUploading(true);
+        try {
+            const response = await fetch(`${API_URL}/api/security/import`, {
+                method: 'POST',
+                body: formData,
+            });
+            if (response.ok) {
+                fetchStats();
+                // Reset input
+                event.target.value = '';
+            } else {
+                console.error('Upload failed');
+            }
+        } catch (error) {
+            console.error('Upload error', error);
+        } finally {
+            setUploading(false);
         }
     };
+
+    const handleDelete = async (id: string) => {
+        if(!confirm('Are you sure you want to delete this log?')) return;
+        try {
+            const response = await fetch(`${API_URL}/api/security/log/${id}`, {
+                method: 'DELETE',
+            });
+            if (response.ok) {
+                fetchStats(); // Refresh
+            }
+        } catch (error) {
+            console.error('Delete failed', error);
+        }
+    };
+
+    const handleStatusUpdate = async (id: string, newStatus: string) => {
+        try {
+            const response = await fetch(`${API_URL}/api/security/log/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ review_status: newStatus })
+            });
+            if (response.ok) {
+                fetchStats(); // Refresh
+            }
+        } catch (error) {
+            console.error('Update failed', error);
+        }
+    };
+    
+    // Filter logs
+    const filteredLogs = logs.filter(log => {
+        if (filterStatus === 'all') return true;
+        return log.review_status === filterStatus;
+    });
 
     return (
-        <div className="space-y-6">
-            <Card>
-                <CardHeader>
-                    <CardTitle>Import Security Logs</CardTitle>
-                    <CardDescription>Upload a CSV file containing security logs for analysis</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="flex items-center gap-4">
-                        <div className="grid w-full max-w-sm items-center gap-1.5">
-                            <input
-                                type="file"
-                                accept=".csv"
-                                onChange={handleFileChange}
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                            />
+        <div className="space-y-6 animate-in fade-in duration-500">
+            <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
+                    Security Analytics
+                </h2>
+                <div className="flex gap-2">
+                    <div className="relative group">
+                        <button className="flex items-center gap-2 px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 text-slate-300 transition-colors">
+                            <span className="text-sm font-medium">Export</span>
+                        </button>
+                        <div className="absolute right-0 mt-2 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                            <a href={`${API_URL}/api/security/export?type=csv`} target="_blank" rel="noreferrer" className="block px-4 py-2 hover:bg-slate-700 text-sm text-slate-300">Download CSV</a>
+                            <a href={`${API_URL}/api/security/export?type=pdf`} target="_blank" rel="noreferrer" className="block px-4 py-2 hover:bg-slate-700 text-sm text-slate-300">Download PDF</a>
                         </div>
-                        <Button onClick={handleUpload} disabled={!file || isUploading}>
-                            {isUploading ? "Uploading..." : "Import CSV"}
-                            <Upload className="ml-2 h-4 w-4" />
-                        </Button>
                     </div>
-                    {file && (
-                        <p className="text-sm text-muted-foreground mt-2">
-                            Selected: {file.name} ({(file.size / 1024).toFixed(2)} KB)
-                        </p>
-                    )}
-                </CardContent>
-            </Card>
+                    <div className="relative">
+                        <input
+                            type="file"
+                            accept=".csv"
+                            onChange={handleFileUpload}
+                            className="hidden"
+                            id="csv-upload"
+                        />
+                        <label
+                            htmlFor="csv-upload"
+                            className={`flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer transition-all duration-300 ${
+                                uploading 
+                                ? 'bg-slate-700 text-slate-400 cursor-not-allowed' 
+                                : 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg hover:shadow-blue-500/25'
+                            }`}
+                        >
+                            {uploading ? <Activity className="animate-spin" size={18} /> : <FileUp size={18} />}
+                            {uploading ? 'Importing...' : 'Import CSV'}
+                        </label>
+                    </div>
+                </div>
+            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Top Suspicious IPs</CardTitle>
-                        <CardDescription>IP addresses with the most failed attempts</CardDescription>
-                    </CardHeader>
-                    <CardContent className="h-[300px]">
-                        {stats && stats.top_ips.length > 0 ? (
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={stats.top_ips} layout="vertical" margin={{ left: 20 }}>
-                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} opacity={0.3} />
-                                    <XAxis type="number" hide />
-                                    <YAxis type="category" dataKey="ip_address" width={120} tick={{ fontSize: 12 }} />
-                                    <Tooltip
-                                        cursor={{ fill: 'transparent' }}
-                                        contentStyle={{ borderRadius: '8px', border: 'none', backgroundColor: 'hsl(var(--card))' }}
-                                    />
-                                    <Bar dataKey="count" fill="hsl(var(--destructive))" radius={[0, 4, 4, 0]}>
-                                        {stats.top_ips.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fillOpacity={0.8} />
-                                        ))}
-                                    </Bar>
-                                </BarChart>
-                            </ResponsiveContainer>
-                        ) : (
-                            <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                                <Shield className="h-8 w-8 mb-2 opacity-50" />
-                                <p>No data available</p>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Recent Security Events</CardTitle>
-                        <CardDescription>Latest logged security incidents</CardDescription>
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium text-slate-400">Total Incidents</CardTitle>
+                        <Shield className="h-4 w-4 text-cyan-400" />
                     </CardHeader>
                     <CardContent>
-                        <div className="space-y-4">
-                            {stats?.recent_logs.slice(0, 5).map((log) => (
-                                <div key={log.id} className="flex items-start gap-4 p-3 rounded-lg border bg-card/50">
-                                    <AlertTriangle className="h-5 w-5 text-destructive mt-0.5" />
-                                    <div className="space-y-1">
-                                        <p className="text-sm font-medium">{log.email || 'Unknown User'}</p>
-                                        <div className="text-xs text-muted-foreground flex gap-2">
-                                            <span>{log.ip_address}</span>
-                                            <span>•</span>
-                                            <span>{format(new Date(log.created_at), 'MMM d, h:mm a')}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                            {!stats?.recent_logs.length && (
-                                <div className="flex flex-col items-center justify-center h-[200px] text-muted-foreground">
-                                    <FileText className="h-8 w-8 mb-2 opacity-50" />
-                                    <p>No logs found</p>
-                                </div>
-                            )}
+                        <div className="text-2xl font-bold text-white">{logs.length}</div>
+                    </CardContent>
+                </Card>
+                <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium text-slate-400">Unreviewed</CardTitle>
+                        <AlertTriangle className="h-4 w-4 text-amber-400" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold text-amber-400">
+                            {logs.filter(l => l.review_status === 'unreviewed').length}
+                        </div>
+                    </CardContent>
+                </Card>
+                 <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium text-slate-400">Top Threat Source</CardTitle>
+                        <Activity className="h-4 w-4 text-red-400" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-lg font-bold text-red-400 truncate">
+                            {stats?.top_ips?.[0]?.ip_address || 'N/A'}
                         </div>
                     </CardContent>
                 </Card>
             </div>
+            
+            {/* Filters */}
+            <div className="flex gap-2">
+                <select 
+                    className="p-2 border rounded-lg bg-slate-800 border-slate-700 text-slate-300 focus:ring-2 focus:ring-cyan-500 focus:border-transparent outline-none transition-all"
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                >
+                    <option value="all">All Statuses</option>
+                    <option value="unreviewed">Unreviewed</option>
+                    <option value="reviewed">Reviewed</option>
+                    <option value="false_positive">False Positive</option>
+                </select>
+            </div>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Security Log Details</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Time</TableHead>
-                                <TableHead>Email</TableHead>
-                                <TableHead>IP Address</TableHead>
-                                <TableHead>Input Details</TableHead>
-                                <TableHead className="text-right">User Agent</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {stats?.recent_logs.map((log) => (
-                                <TableRow key={log.id}>
-                                    <TableCell className="whitespace-nowrap">
-                                        {format(new Date(log.created_at), "MMM d, HH:mm:ss")}
-                                    </TableCell>
-                                    <TableCell>{log.email}</TableCell>
-                                    <TableCell>{log.ip_address}</TableCell>
-                                    <TableCell className="max-w-[200px] truncate" title={log.input_details}>
-                                        {log.input_details || '-'}
-                                    </TableCell>
-                                    <TableCell className="text-right max-w-[200px] truncate text-muted-foreground" title={log.user_agent}>
-                                        {log.user_agent}
-                                    </TableCell>
-                                </TableRow>
+            {/* Table */}
+            <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden backdrop-blur-sm shadow-xl">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left text-slate-300">
+                        <thead className="bg-slate-900/50 text-slate-400 uppercase text-xs tracking-wider">
+                            <tr>
+                                <th className="p-4">Time</th>
+                                <th className="p-4">Email</th>
+                                <th className="p-4">IP Address</th>
+                                <th className="p-4">Attempt Status</th>
+                                <th className="p-4">Review Status</th>
+                                <th className="p-4 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-700/50">
+                            {filteredLogs.map(log => (
+                                <tr key={log.id} className="hover:bg-slate-700/30 transition-colors">
+                                    <td className="p-4 text-sm whitespace-nowrap text-slate-400">
+                                        {new Date(log.created_at).toLocaleString()}
+                                    </td>
+                                    <td className="p-4 font-medium text-white">{log.email}</td>
+                                    <td className="p-4 font-mono text-sm text-cyan-400">{log.ip_address}</td>
+                                    <td className="p-4">
+                                        <span className={`px-2 py-1 rounded-full text-xs font-medium border ${
+                                            log.attempt_status === 'failure' 
+                                            ? 'bg-red-500/10 text-red-400 border-red-500/20' 
+                                            : 'bg-green-500/10 text-green-400 border-green-500/20'
+                                        }`}>
+                                            {log.attempt_status || 'Unknown'}
+                                        </span>
+                                    </td>
+                                    <td className="p-4">
+                                         <select 
+                                            className={`bg-transparent border rounded px-2 py-1 text-xs font-medium outline-none transition-colors ${
+                                                log.review_status === 'unreviewed' ? 'border-amber-500/50 text-amber-500' :
+                                                log.review_status === 'reviewed' ? 'border-green-500/50 text-green-500' :
+                                                'border-slate-500/50 text-slate-400'
+                                            }`}
+                                            value={log.review_status}
+                                            onChange={(e) => handleStatusUpdate(log.id, e.target.value)}
+                                        >
+                                            <option value="unreviewed" className="bg-slate-800 text-amber-500">Unreviewed</option>
+                                            <option value="reviewed" className="bg-slate-800 text-green-500">Reviewed</option>
+                                            <option value="false_positive" className="bg-slate-800 text-slate-400">False Positive</option>
+                                        </select>
+                                    </td>
+                                    <td className="p-4 text-right">
+                                        <button 
+                                            onClick={() => handleDelete(log.id)}
+                                            className="p-2 hover:bg-red-500/20 text-slate-400 hover:text-red-400 rounded-lg transition-all"
+                                            title="Delete Log"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </td>
+                                </tr>
                             ))}
-                            {!stats?.recent_logs.length && (
-                                <TableRow>
-                                    <TableCell colSpan={5} className="text-center h-24 text-muted-foreground">
-                                        No logs found. Upload a CSV to get started.
-                                    </TableCell>
-                                </TableRow>
+                            {filteredLogs.length === 0 && (
+                                <tr>
+                                    <td colSpan={6} className="p-8 text-center text-slate-500">
+                                        No logs found matching filter.
+                                    </td>
+                                </tr>
                             )}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     );
-}
+};

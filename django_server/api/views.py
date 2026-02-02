@@ -336,25 +336,28 @@ class SecurityLogImportView(APIView):
         if not file.name.endswith('.csv'):
             return Response({'error': 'File must be CSV'}, status=400)
             
-        decoded_file = file.read().decode('utf-8')
+        decoded_file = file.read().decode('utf-8-sig') # Handle BOM
         io_string = io.StringIO(decoded_file)
+        # Use a DictReader that handles potential whitespace in headers
         reader = csv.DictReader(io_string)
         
+        # Normalize headers: strip whitespace
+        if reader.fieldnames:
+            reader.fieldnames = [name.strip() for name in reader.fieldnames]
+
         logs = []
         for row in reader:
-            # Map CSV fields to model - check for variations in CSV headers if needed
             email = row.get('email')
-            ip = row.get('ip_address')
-            
-            # Simple validation
+            # Fallback for email if empty (some logs might be IP only)
             if not email:
                 continue
                 
             logs.append(SecurityLog(
                 email=email,
-                ip_address=ip,
+                ip_address=row.get('ip_address'),
                 user_agent=row.get('user_agent'),
                 input_details=row.get('input_details'),
+                attempt_status=row.get('status'), # Map CSV 'status' to attempt_status
                 created_at=row.get('created_at', timezone.now())
             ))
             
@@ -371,17 +374,164 @@ class SecurityLogAnalyticsView(APIView):
             .order_by('-count')[:5])
             
         # Recent logs for table
-        recent_logs = SecurityLog.objects.all()[:50]
+        recent_logs = SecurityLog.objects.all()[:100] # Increased limit
         logs_data = [{
             'id': log.id,
             'email': log.email,
             'ip_address': log.ip_address,
             'user_agent': log.user_agent,
             'created_at': log.created_at,
-            'input_details': log.input_details
+            'input_details': log.input_details,
+            'attempt_status': log.attempt_status,
+            'review_status': log.review_status
         } for log in recent_logs]
         
         return Response({
             'top_ips': top_ips,
             'recent_logs': logs_data
         })
+
+class SecurityLogActionView(APIView):
+    def delete(self, request, pk):
+        try:
+            log = SecurityLog.objects.get(pk=pk)
+            log.delete()
+            return Response({'message': 'Log deleted'})
+        except SecurityLog.DoesNotExist:
+            return Response({'error': 'Log not found'}, status=404)
+
+    def patch(self, request, pk):
+        try:
+            log = SecurityLog.objects.get(pk=pk)
+            status = request.data.get('review_status')
+            if status:
+                log.review_status = status
+                log.save()
+                return Response({'message': 'Status updated'})
+            return Response({'error': 'No status provided'}, status=400)
+        except SecurityLog.DoesNotExist:
+            return Response({'error': 'Log not found'}, status=404)
+
+# --- Export Views ---
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
+from reportlab.lib.styles import getSampleStyleSheet
+from django.http import HttpResponse
+
+class StatsExportView(APIView):
+    def get(self, request):
+        export_type = request.query_params.get('type', 'csv')
+        
+        # Aggregate stats (simplified for report)
+        stats = {
+            'total_sent': EmailLog.objects.filter(status='sent').count(),
+            'total_failed': EmailLog.objects.filter(status='failed').count(),
+            'total_campaigns': EmailCampaign.objects.count(),
+            'recent_campaigns': EmailCampaign.objects.all().order_by('-created_at')[:10]
+        }
+
+        if export_type == 'csv':
+            response = HttpResponse(content_type='text/csv')
+            response['Content-Disposition'] = 'attachment; filename="campaign_stats.csv"'
+            
+            writer = csv.writer(response)
+            writer.writerow(['Metric', 'Value'])
+            writer.writerow(['Total Sent', stats['total_sent']])
+            writer.writerow(['Total Failed', stats['total_failed']])
+            writer.writerow(['Total Campaigns', stats['total_campaigns']])
+            writer.writerow([])
+            writer.writerow(['Recent Campaigns'])
+            writer.writerow(['Name', 'Status', 'Sent', 'Failed', 'Date'])
+            for c in stats['recent_campaigns']:
+                writer.writerow([c.name, c.status, c.sent_count, c.failed_count, c.created_at])
+            
+            return response
+
+        elif export_type == 'pdf':
+            response = HttpResponse(content_type='application/pdf')
+            response['Content-Disposition'] = 'attachment; filename="campaign_stats.pdf"'
+            
+            doc = SimpleDocTemplate(response, pagesize=letter)
+            elements = []
+            styles = getSampleStyleSheet()
+            
+            elements.append(Paragraph("Campaign Analytics Report", styles['Title']))
+            
+            # Summary Table
+            data = [
+                ['Metric', 'Value'],
+                ['Total Sent', stats['total_sent']],
+                ['Total Failed', stats['total_failed']],
+                ['Total Campaigns', stats['total_campaigns']]
+            ]
+            t = Table(data)
+            t.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+            elements.append(t)
+            
+            doc.build(elements)
+            return response
+            
+        return Response({'error': 'Invalid type'}, status=400)
+
+class SecurityLogExportView(APIView):
+    def get(self, request):
+        export_type = request.query_params.get('type', 'csv')
+        logs = SecurityLog.objects.all().order_by('-created_at')[:500] # Limit export size
+        
+        if export_type == 'csv':
+            response = HttpResponse(content_type='text/csv')
+            response['Content-Disposition'] = 'attachment; filename="security_logs.csv"'
+            
+            writer = csv.writer(response)
+            writer.writerow(['Time', 'Email', 'IP Address', 'Attempt Status', 'Review Status', 'User Agent'])
+            for log in logs:
+                writer.writerow([
+                    log.created_at, log.email, log.ip_address, 
+                    log.attempt_status, log.review_status, log.user_agent
+                ])
+            return response
+            
+        elif export_type == 'pdf':
+            response = HttpResponse(content_type='application/pdf')
+            response['Content-Disposition'] = 'attachment; filename="security_logs.pdf"'
+            
+            doc = SimpleDocTemplate(response, pagesize=letter)
+            elements = []
+            styles = getSampleStyleSheet()
+            
+            elements.append(Paragraph("Security Logs Report", styles['Title']))
+            
+            # Table Data with wrapping for long text
+            data = [['Time', 'Email', 'IP', 'Status']]
+            for log in logs[:50]: # Limit for PDF readability
+                data.append([
+                    str(log.created_at)[:19],
+                    log.email,
+                    log.ip_address,
+                    log.attempt_status
+                ])
+                
+            t = Table(data)
+            t.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 8),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey)
+            ]))
+            elements.append(t)
+            
+            doc.build(elements)
+            return response
+
+        return Response({'error': 'Invalid type'}, status=400)

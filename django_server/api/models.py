@@ -101,6 +101,8 @@ class SecurityLog(models.Model):
     ip_address = models.GenericIPAddressField(blank=True, null=True)
     user_agent = models.TextField(blank=True, null=True)
     input_details = models.TextField(blank=True, null=True)
+    attempt_status = models.CharField(max_length=50, blank=True, null=True) # From CSV
+    review_status = models.CharField(max_length=50, default='unreviewed') # Managed by user
     created_at = models.DateTimeField(default=timezone.now)
 
     class Meta:

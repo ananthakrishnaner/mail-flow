@@ -35,6 +35,7 @@ const COLORS = ['hsl(173, 80%, 40%)', 'hsl(0, 72%, 51%)', 'hsl(38, 92%, 50%)', '
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SecurityAnalytics } from "@/components/analytics/SecurityAnalytics";
+import { API_URL } from '../../config';
 
 export default function Analytics() {
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>('all');
@@ -114,6 +115,17 @@ export default function Analytics() {
             <p className="text-muted-foreground mt-1">
               Comprehensive email campaign analytics and insights
             </p>
+          </div>
+          <div className="flex gap-2">
+            <div className="relative group">
+              <button className="flex items-center gap-2 px-4 py-2 bg-card border border-border rounded-lg hover:bg-muted transition-colors">
+                <span className="text-sm font-medium">Export Report</span>
+              </button>
+              <div className="absolute right-0 mt-2 w-48 bg-card border border-border rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                <a href={`${API_URL}/api/stats/export?type=csv`} target="_blank" rel="noreferrer" className="block px-4 py-2 hover:bg-muted text-sm">Download CSV</a>
+                <a href={`${API_URL}/api/stats/export?type=pdf`} target="_blank" rel="noreferrer" className="block px-4 py-2 hover:bg-muted text-sm">Download PDF</a>
+              </div>
+            </div>
           </div>
         </div>
 
