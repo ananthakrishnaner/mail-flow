@@ -2,6 +2,10 @@
 
 This guide provides a complete, step-by-step workflow to deploy Mail Muse to a production Ubuntu server for the domain **`mail.ak-hospitql.com`**.
 
+**IMPORTANT NOTE ON PATHS:**
+This guide assumes your project directory is `/var/www/mail-muse`.
+If your directory is `/var/www/mail-flow`, please replace `mail-muse` with `mail-flow` in all commands below.
+
 ## Prerequisites
 - A server running **Ubuntu 24.04** (or 20.04/22.04).
 - Root or `sudo` access.
@@ -26,12 +30,12 @@ sudo apt install python3-pip python3-venv nginx git acl -y
 Set up the web directory and ensure your user has permissions.
 
 ```bash
-# Create directory
+# Create directory (Change mail-muse to mail-flow if needed)
 sudo mkdir -p /var/www/mail-muse
 
-# Set permissions (replace 'ubuntu' with your actual username if different)
-sudo setfacl -R -m u:ubuntu:rwx /var/www/mail-muse
-sudo chown -R ubuntu:www-data /var/www/mail-muse
+# Set permissions (we use www-data since it is the standard web user)
+sudo setfacl -R -m u:www-data:rwx /var/www/mail-muse
+sudo chown -R www-data:www-data /var/www/mail-muse
 
 cd /var/www/mail-muse
 ```
@@ -61,7 +65,7 @@ source venv/bin/activate
 
 # 2. Install Dependencies
 pip install -r requirements.txt
-pip install gunicorn
+# (gunicorn is now in requirements.txt)
 
 # 3. Configure .env
 nano .env
@@ -89,7 +93,7 @@ Set up Gunicorn to keep the backend running automatically.
 sudo nano /etc/systemd/system/mail-muse.service
 ```
 
-Paste the following:
+Paste the following (ensure paths match your actual directory, e.g., `mail-flow` vs `mail-muse`):
 
 ```ini
 [Unit]
@@ -97,7 +101,7 @@ Description=Gunicorn daemon for Mail Muse
 After=network.target
 
 [Service]
-User=ubuntu
+User=www-data
 Group=www-data
 WorkingDirectory=/var/www/mail-muse/django_server
 ExecStart=/var/www/mail-muse/django_server/venv/bin/gunicorn \
@@ -199,12 +203,28 @@ sudo ufw enable
 
 ---
 
-## ✅ Deployment Checklist
+## 🔧 Troubleshooting
 
-- [ ] **Domain**: navigate to `https://mail.ak-hospitql.com`
-- [ ] **API**: Check `https://mail.ak-hospitql.com/api/config`
-- [ ] **Scheduler**: The backend scheduler runs automatically inside the Gunicorn workers.
+### 500 Internal Server Error
+This is usually a **Permission Issue** with the database.
+If you ran commands as `root`, the `db.sqlite3` file is owned by root, but the web server (Gunicorn) runs as `ubuntu` or `www-data`.
 
-**Troubleshooting:**
-- Backend logs: `sudo journalctl -u mail-muse -f`
-- Nginx logs: `sudo tail -f /var/log/nginx/error.log`
+**Fix:**
+Reset ownership of the entire project directory:
+```bash
+# Replace /var/www/mail-muse with your actual path (e.g., /var/www/mail-flow)
+sudo chown -R www-data:www-data /var/www/mail-muse
+sudo chmod -R 775 /var/www/mail-muse
+sudo systemctl restart mail-muse
+```
+
+### Check Logs
+Backend logs:
+```bash
+sudo journalctl -u mail-muse -f
+```
+
+Nginx error logs:
+```bash
+sudo tail -f /var/log/nginx/error.log
+```

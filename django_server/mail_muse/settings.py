@@ -15,11 +15,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR.parent / '.env')
 
 # Quick-start development settings - unsuitable for production
-SECRET_KEY = 'django-insecure-25cpscp3ip)qm82p0(@%@h5a76&wj+&=*ss0f)%770zp8xb_1g'
+# Quick-start development settings - unsuitable for production
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-25cpscp3ip)qm82p0(@%@h5a76&wj+&=*ss0f)%770zp8xb_1g')
 
-DEBUG = True
+DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '*').split(',')
 
 # Application definition
 
