@@ -94,3 +94,15 @@ class MailConfig(models.Model):
 
     class Meta:
         db_table = 'mail_config'
+
+class SecurityLog(models.Model):
+    id = models.CharField(max_length=255, primary_key=True, default=uuid.uuid4)
+    email = models.EmailField(blank=True, null=True)
+    ip_address = models.GenericIPAddressField(blank=True, null=True)
+    user_agent = models.TextField(blank=True, null=True)
+    input_details = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        db_table = 'security_logs'
+        ordering = ['-created_at']

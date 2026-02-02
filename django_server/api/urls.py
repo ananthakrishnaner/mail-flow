@@ -5,7 +5,8 @@ from .views import (
     TemplateListView, TemplateDetailView,
     CampaignListView, CampaignDetailView, CampaignStatusView, CampaignStartView,
     CampaignLogsView, StatsSummaryView,
-    TestEmailView, TrackEmailView
+    TestEmailView, TrackEmailView, RecentActivityView,
+    SecurityLogImportView, SecurityLogAnalyticsView
 )
 
 urlpatterns = [
@@ -26,5 +27,9 @@ urlpatterns = [
     
     path('stats/summary', StatsSummaryView.as_view()),
     path('test-email', TestEmailView.as_view()),
+    path('test-email', TestEmailView.as_view()),
     path('track-email', TrackEmailView.as_view()),
+    path('stats/recent-activity', RecentActivityView.as_view()),
+    path('security/import', SecurityLogImportView.as_view()),
+    path('security/stats', SecurityLogAnalyticsView.as_view()),
 ]

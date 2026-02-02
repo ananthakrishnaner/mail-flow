@@ -3,6 +3,7 @@ import { StatCard } from '@/components/dashboard/StatCard';
 import { EmailChart } from '@/components/dashboard/EmailChart';
 import { RecentCampaigns } from '@/components/dashboard/RecentCampaigns';
 import { ScheduledJobs } from '@/components/dashboard/ScheduledJobs';
+import { RecentActivity } from '@/components/dashboard/RecentActivity';
 import { useEmailStats } from '@/hooks/useEmailStats';
 import { Mail, Send, Clock, AlertCircle, Loader2, LayoutDashboard, Users } from 'lucide-react';
 
@@ -66,6 +67,8 @@ export default function Dashboard() {
           <EmailChart dailyStats={stats.dailyStats} />
           <ScheduledJobs />
         </div>
+
+        <RecentActivity />
 
         <RecentCampaigns />
       </div>

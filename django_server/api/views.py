@@ -1,3 +1,6 @@
+import csv
+import io
+import json
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -302,3 +305,83 @@ class TrackEmailView(APIView):
 
         pixel = base64.b64decode('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7')
         return HttpResponse(pixel, content_type='image/gif')
+
+# --- Recent Activity ---
+class RecentActivityView(APIView):
+    def get(self, request):
+        # Fetch last 20 logs
+        logs = EmailLog.objects.filter(
+            status__in=['sent', 'failed']
+        ).select_related('campaign').order_by('-created_at')[:20]
+        
+        data = []
+        for log in logs:
+            data.append({
+                'id': log.id,
+                'email': log.recipient,
+                'campaign_name': log.campaign.name if log.campaign else 'Test Email',
+                'status': log.status,
+                'created_at': log.created_at
+            })
+            
+        return Response(data)
+
+# --- Security Analytics ---
+class SecurityLogImportView(APIView):
+    def post(self, request):
+        if 'file' not in request.FILES:
+            return Response({'error': 'No file provided'}, status=400)
+        
+        file = request.FILES['file']
+        if not file.name.endswith('.csv'):
+            return Response({'error': 'File must be CSV'}, status=400)
+            
+        decoded_file = file.read().decode('utf-8')
+        io_string = io.StringIO(decoded_file)
+        reader = csv.DictReader(io_string)
+        
+        logs = []
+        for row in reader:
+            # Map CSV fields to model - check for variations in CSV headers if needed
+            email = row.get('email')
+            ip = row.get('ip_address')
+            
+            # Simple validation
+            if not email:
+                continue
+                
+            logs.append(SecurityLog(
+                email=email,
+                ip_address=ip,
+                user_agent=row.get('user_agent'),
+                input_details=row.get('input_details'),
+                created_at=row.get('created_at', timezone.now())
+            ))
+            
+        if logs:
+            SecurityLog.objects.bulk_create(logs)
+            
+        return Response({'message': f'Imported {len(logs)} logs successfully'})
+
+class SecurityLogAnalyticsView(APIView):
+    def get(self, request):
+        # Top IPs
+        top_ips = list(SecurityLog.objects.values('ip_address')
+            .annotate(count=models.Count('ip_address'))
+            .order_by('-count')[:5])
+            
+        # Recent logs for table
+        recent_logs = SecurityLog.objects.all()[:50]
+        logs_data = [{
+            'id': log.id,
+            'email': log.email,
+            'ip_address': log.ip_address,
+            'user_agent': log.user_agent,
+            'created_at': log.created_at,
+            'input_details': log.input_details
+        } for log in recent_logs]
+        
+        return Response({
+            'top_ips': top_ips,
+            'recent_logs': logs_data
+        })
