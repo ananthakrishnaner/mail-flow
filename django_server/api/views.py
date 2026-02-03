@@ -384,28 +384,31 @@ class SecurityLogImportView(APIView):
 
 class SecurityLogAnalyticsView(APIView):
     def get(self, request):
-        # Top IPs
-        top_ips = list(SecurityLog.objects.values('ip_address')
-            .annotate(count=models.Count('ip_address'))
-            .order_by('-count')[:5])
+        try:
+            # Top IPs
+            top_ips = list(SecurityLog.objects.values('ip_address')
+                .annotate(count=Count('ip_address'))
+                .order_by('-count')[:5])
+                
+            # Recent logs for table
+            recent_logs = SecurityLog.objects.all()[:100] # Increased limit
+            logs_data = [{
+                'id': log.id,
+                'email': log.email,
+                'ip_address': log.ip_address,
+                'user_agent': log.user_agent,
+                'created_at': log.created_at,
+                'input_details': log.input_details,
+                'attempt_status': log.attempt_status,
+                'review_status': log.review_status
+            } for log in recent_logs]
             
-        # Recent logs for table
-        recent_logs = SecurityLog.objects.all()[:100] # Increased limit
-        logs_data = [{
-            'id': log.id,
-            'email': log.email,
-            'ip_address': log.ip_address,
-            'user_agent': log.user_agent,
-            'created_at': log.created_at,
-            'input_details': log.input_details,
-            'attempt_status': log.attempt_status,
-            'review_status': log.review_status
-        } for log in recent_logs]
-        
-        return Response({
-            'top_ips': top_ips,
-            'recent_logs': logs_data
-        })
+            return Response({
+                'top_ips': top_ips,
+                'recent_logs': logs_data
+            })
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class SecurityLogActionView(APIView):
     def delete(self, request, pk):
