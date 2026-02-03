@@ -19,6 +19,7 @@ dist-ssr
 *.sqlite
 *.db
 django_server/db.sqlite3
+django_server/venv/*
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
