@@ -479,6 +479,9 @@ class SecurityLogAnalyticsView(APIView):
                     pass
 
             total_logs = logs_query.count()
+            success_count = logs_query.filter(attempt_status='success').count()
+            failure_count = logs_query.filter(attempt_status='failure').count()
+
             start = (page - 1) * limit
             end = start + limit
             recent_logs = logs_query[start:end]
@@ -499,6 +502,11 @@ class SecurityLogAnalyticsView(APIView):
                 'status_distribution': status_dist,
                 'timeline_data': timeline_data,
                 'recent_logs': logs_data,
+                'counts': {
+                    'total': total_logs,
+                    'success': success_count,
+                    'failure': failure_count
+                },
                 'pagination': {
                     'total': total_logs,
                     'page': page,
@@ -603,11 +611,16 @@ class StatsExportView(APIView):
 class SecurityLogExportView(APIView):
     def get(self, request):
         export_type = request.query_params.get('type', 'csv')
-        logs = SecurityLog.objects.all().order_by('-created_at')[:500] # Limit export size
+        status_filter = request.query_params.get('status')
         
+        logs = SecurityLog.objects.all().order_by('-created_at')
+        if status_filter:
+            logs = logs.filter(attempt_status=status_filter)
+            
         if export_type == 'csv':
             response = HttpResponse(content_type='text/csv')
-            response['Content-Disposition'] = 'attachment; filename="security_logs.csv"'
+            filename = f"security_logs_{status_filter if status_filter else 'all'}.csv"
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
             
             writer = csv.writer(response)
             writer.writerow(['Time', 'Email', 'IP Address', 'Attempt Status', 'Review Status', 'User Agent'])

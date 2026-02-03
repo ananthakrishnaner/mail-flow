@@ -222,8 +222,10 @@ export const SecurityAnalytics = () => {
                         <button className="flex items-center gap-2 px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg hover:bg-zinc-800 text-white transition-colors">
                             <span className="text-sm font-medium">Export</span>
                         </button>
-                        <div className="absolute right-0 mt-2 w-40 bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                            <a href={`${API_URL}/security/export?type=csv`} target="_blank" rel="noreferrer" className="block px-4 py-2 hover:bg-slate-700 text-sm text-slate-300">Download CSV</a>
+                        <div className="absolute right-0 mt-2 w-48 bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                            <a href={`${API_URL}/security/export?type=csv`} target="_blank" rel="noreferrer" className="block px-4 py-2 hover:bg-slate-700 text-sm text-slate-300">Download All (CSV)</a>
+                            <a href={`${API_URL}/security/export?type=csv&status=success`} target="_blank" rel="noreferrer" className="block px-4 py-2 hover:bg-slate-700 text-sm text-emerald-400">Download Success (CSV)</a>
+                            <a href={`${API_URL}/security/export?type=csv&status=failure`} target="_blank" rel="noreferrer" className="block px-4 py-2 hover:bg-slate-700 text-sm text-red-400">Download Failure (CSV)</a>
                             <a href={`${API_URL}/security/export?type=pdf`} target="_blank" rel="noreferrer" className="block px-4 py-2 hover:bg-slate-700 text-sm text-slate-300">Download PDF</a>
                         </div>
                     </div>
@@ -253,32 +255,32 @@ export const SecurityAnalytics = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card className="bg-zinc-950 border-zinc-900 backdrop-blur-sm">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-slate-400">Total Incidents</CardTitle>
+                        <CardTitle className="text-sm font-medium text-slate-400">Total Emails</CardTitle>
                         <Shield className="h-4 w-4 text-cyan-400" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-white">{logs.length}</div>
+                        <div className="text-2xl font-bold text-white">{stats?.counts?.total || 0}</div>
                     </CardContent>
                 </Card>
                 <Card className="bg-zinc-950 border-zinc-900 backdrop-blur-sm">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-slate-400">Unreviewed</CardTitle>
-                        <AlertTriangle className="h-4 w-4 text-amber-400" />
+                        <CardTitle className="text-sm font-medium text-slate-400">Successful Emails</CardTitle>
+                        <CheckCircle className="h-4 w-4 text-emerald-400" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-amber-400">
-                            {logs.filter(l => l.review_status === 'unreviewed').length}
+                        <div className="text-2xl font-bold text-emerald-400">
+                            {stats?.counts?.success || 0}
                         </div>
                     </CardContent>
                 </Card>
                 <Card className="bg-zinc-950 border-zinc-900 backdrop-blur-sm">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-slate-400">Top Threat Source</CardTitle>
-                        <Activity className="h-4 w-4 text-red-400" />
+                        <CardTitle className="text-sm font-medium text-slate-400">Failed Attempts</CardTitle>
+                        <AlertTriangle className="h-4 w-4 text-red-400" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-lg font-bold text-red-400 truncate">
-                            {stats?.top_ips?.[0]?.ip_address || 'N/A'}
+                        <div className="text-2xl font-bold text-red-400">
+                            {stats?.counts?.failure || 0}
                         </div>
                     </CardContent>
                 </Card>

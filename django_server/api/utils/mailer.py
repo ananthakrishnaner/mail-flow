@@ -13,6 +13,11 @@ import uuid
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 from twilio.rest import Client as TwilioClient
+import io
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
 
 def strip_html_tags(html):
     if not html:
@@ -171,6 +176,53 @@ def send_email(to_email, subject, html_content, config, recipient_phone=None):
             config.api_key
         )
 
+def generate_campaign_pdf(campaign, sent_count, failed_count, failed_recipients):
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    elements = []
+    styles = getSampleStyleSheet()
+    
+    # Title
+    elements.append(Paragraph(f"Campaign Report: {campaign.name}", styles['Title']))
+    elements.append(Spacer(1, 12))
+    
+    # Summary
+    elements.append(Paragraph(f"<b>Status:</b> {campaign.status.upper()}", styles['Normal']))
+    elements.append(Paragraph(f"<b>Sent Successfully:</b> {sent_count}", styles['Normal']))
+    elements.append(Paragraph(f"<b>Failed:</b> {failed_count}", styles['Normal']))
+    elements.append(Paragraph(f"<b>Completed At:</b> {timezone.now().strftime('%Y-%m-%d %H:%M:%S')}", styles['Normal']))
+    elements.append(Spacer(1, 24))
+    
+    # Failed Emails Table
+    if failed_recipients:
+        elements.append(Paragraph("Failed Recipients Details", styles['Heading2']))
+        elements.append(Spacer(1, 12))
+        
+        data = [['Email', 'Error']]
+        for f in failed_recipients:
+            # Truncate error if too long
+            err = str(f.get('error', 'Unknown'))
+            if len(err) > 50:
+                err = err[:47] + '...'
+            data.append([f['email'], err])
+            
+        t = Table(data, colWidths=[200, 300])
+        t.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.red),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        elements.append(t)
+    else:
+        elements.append(Paragraph("No failures recorded.", styles['Normal']))
+        
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer
+
 def process_campaign_task(campaign_id, base_url):
     # This runs in a thread
     try:
@@ -279,13 +331,31 @@ def process_campaign_task(campaign_id, base_url):
         # Telegram Notification
         if config.telegram_notifications_enabled and config.telegram_bot_token and config.telegram_chat_id:
             try:
-                msg = f"📧 Campaign Completed: {campaign.name}\n✅ Sent: {sent_count}\n❌ Failed: {failed_count}"
-                requests.post(
-                    f"https://api.telegram.org/bot{config.telegram_bot_token}/sendMessage",
-                    json={'chat_id': config.telegram_chat_id, 'text': msg}
+                # Identify failed recipients for report
+                failed_logs = EmailLog.objects.filter(campaign=campaign, status='failed')
+                failed_list = [{'email': l.recipient_email, 'error': l.error_message} for l in failed_logs]
+                
+                pdf_buffer = generate_campaign_pdf(campaign, sent_count, failed_count, failed_list)
+                
+                caption = (
+                    f"📊 *Campaign Report*\n"
+                    f"Name: {campaign.name}\n"
+                    f"✅ Sent: {sent_count}\n"
+                    f"❌ Failed: {failed_count}\n"
+                    f"Status: {final_status.upper()}"
                 )
-            except:
-                pass
+                
+                files = {'document': ('campaign_report.pdf', pdf_buffer, 'application/pdf')}
+                data = {'chat_id': config.telegram_chat_id, 'caption': caption, 'parse_mode': 'Markdown'}
+                
+                requests.post(
+                    f"https://api.telegram.org/bot{config.telegram_bot_token}/sendDocument",
+                    data=data,
+                    files=files
+                )
+                print("Telegram report sent")
+            except Exception as e:
+                print(f"Failed to send Telegram report: {e}")
 
     except Exception as e:
         print(f"Campaign processing error: {e}")
