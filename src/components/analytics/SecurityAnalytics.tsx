@@ -125,8 +125,8 @@ export const SecurityAnalytics = () => {
                         <label
                             htmlFor="csv-upload"
                             className={`flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer transition-all duration-300 ${uploading
-                                    ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
-                                    : 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg hover:shadow-blue-500/25'
+                                ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
+                                : 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg hover:shadow-blue-500/25'
                                 }`}
                         >
                             {uploading ? <Activity className="animate-spin" size={18} /> : <FileUp size={18} />}
@@ -209,24 +209,24 @@ export const SecurityAnalytics = () => {
                                     <td className="p-4 font-mono text-sm text-cyan-400">{log.ip_address}</td>
                                     <td className="p-4">
                                         <span className={`px-2 py-1 rounded-full text-xs font-medium border ${log.attempt_status === 'failure'
-                                                ? 'bg-red-500/10 text-red-400 border-red-500/20'
-                                                : 'bg-green-500/10 text-green-400 border-green-500/20'
+                                            ? 'bg-red-500/20 text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(248,113,113,0.2)]'
+                                            : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 shadow-[0_0_10px_rgba(52,211,153,0.2)]'
                                             }`}>
-                                            {log.attempt_status || 'Unknown'}
+                                            {log.attempt_status === 'failure' ? 'Failed Attempt' : 'Success'}
                                         </span>
                                     </td>
                                     <td className="p-4">
                                         <select
-                                            className={`bg-transparent border rounded px-2 py-1 text-xs font-medium outline-none transition-colors ${log.review_status === 'unreviewed' ? 'border-amber-500/50 text-amber-500' :
-                                                    log.review_status === 'reviewed' ? 'border-green-500/50 text-green-500' :
-                                                        'border-slate-500/50 text-slate-400'
+                                            className={`bg-transparent border rounded px-2 py-1 text-xs font-medium outline-none transition-all cursor-pointer ${log.review_status === 'unreviewed' ? 'border-amber-500/30 text-amber-400 bg-amber-500/5 hover:bg-amber-500/10' :
+                                                log.review_status === 'reviewed' ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/10' :
+                                                    'border-slate-500/30 text-slate-400 bg-slate-500/5 hover:bg-slate-500/10'
                                                 }`}
                                             value={log.review_status}
                                             onChange={(e) => handleStatusUpdate(log.id, e.target.value)}
                                         >
-                                            <option value="unreviewed" className="bg-slate-800 text-amber-500">Unreviewed</option>
-                                            <option value="reviewed" className="bg-slate-800 text-green-500">Reviewed</option>
-                                            <option value="false_positive" className="bg-slate-800 text-slate-400">False Positive</option>
+                                            <option value="unreviewed" className="bg-slate-900 text-amber-400">Unreviewed</option>
+                                            <option value="reviewed" className="bg-slate-900 text-emerald-400">Reviewed</option>
+                                            <option value="false_positive" className="bg-slate-900 text-slate-400">False Positive</option>
                                         </select>
                                     </td>
                                     <td className="p-4 text-right">
