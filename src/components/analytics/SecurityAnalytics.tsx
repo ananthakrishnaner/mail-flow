@@ -447,10 +447,10 @@ export const SecurityAnalytics = () => {
             </div>
 
             {/* Table */}
-            <div className="bg-zinc-900/50 rounded-xl border border-zinc-800 overflow-hidden backdrop-blur-sm shadow-xl">
+            <div className="bg-zinc-950 rounded-xl border border-zinc-900 overflow-hidden backdrop-blur-sm shadow-xl">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-zinc-300">
-                        <thead className="bg-zinc-950/50 text-zinc-400 uppercase text-xs tracking-wider">
+                        <thead className="bg-black text-zinc-400 uppercase text-xs tracking-wider border-b border-zinc-900">
                             <tr>
                                 <th className="p-4 w-[50px]">
                                     <button onClick={toggleSelectAll} className="text-zinc-400 hover:text-white">
@@ -477,8 +477,8 @@ export const SecurityAnalytics = () => {
                                             if ((e.target as HTMLElement).closest('button, select, input')) return;
                                             toggleExpand(log.id);
                                         }}
-                                        className={`transition-colors cursor-pointer ${selectedIds.has(log.id) ? 'bg-blue-500/10 hover:bg-blue-500/20' : 'hover:bg-zinc-800/30'
-                                            } ${expandedRows.has(log.id) ? 'bg-zinc-800/50' : ''}`}
+                                        className={`transition-colors cursor-pointer border-b border-zinc-900/50 ${selectedIds.has(log.id) ? 'bg-blue-900/10 hover:bg-blue-900/20' : 'hover:bg-zinc-900'
+                                            } ${expandedRows.has(log.id) ? 'bg-zinc-900' : ''}`}
                                     >
                                         <td className="p-4">
                                             <button onClick={() => toggleSelect(log.id)} className={`transition-colors ${selectedIds.has(log.id) ? 'text-blue-400' : 'text-zinc-600 hover:text-zinc-400'}`}>
@@ -528,17 +528,17 @@ export const SecurityAnalytics = () => {
                                         </td>
                                     </tr>
                                     {expandedRows.has(log.id) && (
-                                        <tr className="bg-zinc-900/40 border-t border-zinc-800/50 animate-in fade-in slide-in-from-top-1">
+                                        <tr className="bg-black/40 border-t border-zinc-900 animate-in fade-in slide-in-from-top-1">
                                             <td colSpan={9} className="p-6">
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                     <div className="space-y-4">
                                                         <div>
                                                             <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1">User Agent</h4>
-                                                            <p className="text-sm text-zinc-300 font-mono bg-zinc-950/50 p-3 rounded border border-zinc-800 break-all">{log.user_agent}</p>
+                                                            <p className="text-sm text-zinc-300 font-mono bg-zinc-900/50 p-3 rounded border border-zinc-900 break-all">{log.user_agent}</p>
                                                         </div>
                                                         <div>
                                                             <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1">Input Details</h4>
-                                                            <p className="text-sm text-zinc-300 font-mono bg-zinc-950/50 p-3 rounded border border-zinc-800 whitespace-pre-wrap">{log.input_details}</p>
+                                                            <p className="text-sm text-zinc-300 font-mono bg-zinc-900/50 p-3 rounded border border-zinc-900 whitespace-pre-wrap">{log.input_details}</p>
                                                         </div>
                                                     </div>
                                                     <div className="space-y-4">
