@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
+import { Download } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useCampaigns } from '@/hooks/useCampaigns';
 import { cn } from '@/lib/utils';
@@ -62,6 +63,17 @@ export function RecentCampaigns() {
                 <Badge className={cn('capitalize', statusStyles[campaign.status] || statusStyles.draft)}>
                   {campaign.status}
                 </Badge>
+                <div className="flex gap-2 ml-4">
+                  <a
+                    href={`http://localhost:8000/api/stats/export?type=csv&campaign_id=${campaign.id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="p-2 hover:bg-zinc-800 rounded-lg transition-colors text-slate-400 hover:text-white"
+                    title="Download Report"
+                  >
+                    <Download size={16} />
+                  </a>
+                </div>
               </div>
             </div>
           ))}

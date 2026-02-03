@@ -12,7 +12,11 @@ from .models import MailConfig, EmailRecipient, EmailTemplate, EmailCampaign, Em
 from .serializers import MailConfigSerializer, EmailRecipientSerializer, EmailTemplateSerializer, EmailCampaignSerializer, EmailLogSerializer
 from .utils.mailer import process_campaign, send_email, process_template_variables
 import uuid
-import json
+from django.http import HttpResponse
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
 
 # --- Config ---
 class ConfigView(APIView):
@@ -424,10 +428,22 @@ class SecurityLogAnalyticsView(APIView):
                 .annotate(count=Count('ip_address'))
                 .order_by('-count')[:5])
             
-            # Status Distribution for Pie Chart
-            status_dist = list(SecurityLog.objects.values('attempt_status')
-                .annotate(count=Count('id'))
-                .order_by('-count'))
+            # Input Length Distribution
+            # We want to highlight inputs > 2 characters
+            all_inputs = SecurityLog.objects.all().values_list('input_details', flat=True)
+            long_input_count = 0
+            short_input_count = 0
+            
+            for inp in all_inputs:
+                if inp and len(str(inp)) > 2:
+                    long_input_count += 1
+                else:
+                    short_input_count += 1
+            
+            status_dist = [
+                {'name': 'Detailed Input (>2 chars)', 'count': long_input_count},
+                {'name': 'Minimal Input', 'count': short_input_count}
+            ]
                 
             # Timeline data for Scaler Graph (Area/Line) - Last 7 Days
             # SQLite doesn't support TruncDate easily in all versions, but basic date grouping works
@@ -461,6 +477,8 @@ class SecurityLogAnalyticsView(APIView):
             limit = int(request.query_params.get('limit', 1000))
             search_query = request.query_params.get('search', '').lower()
             date_filter = request.query_params.get('date', '')
+            
+            print(f"DEBUG: Search: '{search_query}', Date: '{date_filter}'")
             
             logs_query = SecurityLog.objects.all().order_by('-created_at')
             
@@ -549,6 +567,35 @@ from django.http import HttpResponse
 class StatsExportView(APIView):
     def get(self, request):
         export_type = request.query_params.get('type', 'csv')
+        campaign_id = request.query_params.get('campaign_id')
+        
+        if campaign_id:
+            # Export Combined Logs for specific campaign
+            try:
+                campaign = EmailCampaign.objects.get(id=campaign_id)
+                logs = EmailLog.objects.filter(campaign=campaign).order_by('-created_at')
+                
+                if export_type == 'csv':
+                    response = HttpResponse(content_type='text/csv')
+                    filename = f"campaign_logs_{campaign.name.replace(' ', '_')}.csv"
+                    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+                    
+                    writer = csv.writer(response)
+                    writer.writerow(['Campaign Name', campaign.name])
+                    writer.writerow(['Date', campaign.created_at])
+                    writer.writerow([])
+                    writer.writerow(['Recipient Email', 'Status', 'Sent At', 'Error Message'])
+                    
+                    for log in logs:
+                        writer.writerow([
+                            log.recipient_email,
+                            log.status.upper(),
+                            log.sent_at if log.sent_at else '-',
+                            log.error_message if log.error_message else '-'
+                        ])
+                    return response
+            except EmailCampaign.DoesNotExist:
+                return Response({'error': 'Campaign not found'}, status=404)
         
         # Aggregate stats (simplified for report)
         stats = {

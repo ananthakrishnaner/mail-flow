@@ -322,7 +322,7 @@ export const SecurityAnalytics = () => {
 
                 <Card className="bg-zinc-950 border-zinc-900 backdrop-blur-sm p-4">
                     <CardHeader>
-                        <CardTitle className="text-zinc-400 text-sm font-medium">Status Distribution</CardTitle>
+                        <CardTitle className="text-zinc-400 text-sm font-medium">Input Content Analysis</CardTitle>
                     </CardHeader>
                     <div className="h-[300px] w-full flex items-center justify-center">
                         <ResponsiveContainer width="100%" height="100%">
@@ -335,10 +335,14 @@ export const SecurityAnalytics = () => {
                                     outerRadius={80}
                                     paddingAngle={5}
                                     dataKey="count"
-                                    nameKey="attempt_status"
+                                    nameKey="name"
                                 >
                                     {(stats?.status_distribution || []).map((entry: any, index: number) => (
-                                        <Cell key={`cell-${index}`} fill={entry.attempt_status === 'failure' ? '#ef4444' : '#10b981'} />
+                                        <Cell
+                                            key={`cell-${index}`}
+                                            fill={entry.name.includes('Detailed') ? '#f59e0b' : '#334155'}
+                                            stroke={entry.name.includes('Detailed') ? '#f59e0b' : '#334155'}
+                                        />
                                     ))}
                                 </Pie>
                                 <RechartsTooltip contentStyle={{ backgroundColor: '#18181b', border: '1px solid #27272a' }} />
