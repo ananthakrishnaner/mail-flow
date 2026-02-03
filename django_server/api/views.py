@@ -27,17 +27,20 @@ class ConfigView(APIView):
         config = MailConfig.objects.first()
         data = request.data
         
-        # If updating, merge with existing instance
-        if config:
-            serializer = MailConfigSerializer(config, data=data, partial=True)
-        else:
-            data['id'] = str(uuid.uuid4())
-            serializer = MailConfigSerializer(data=data)
+        try:
+            # If updating, merge with existing instance
+            if config:
+                serializer = MailConfigSerializer(config, data=data, partial=True)
+            else:
+                data['id'] = str(uuid.uuid4())
+                serializer = MailConfigSerializer(data=data)
 
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # --- Recipients ---
 class RecipientListView(APIView):
@@ -348,33 +351,36 @@ class SecurityLogImportView(APIView):
         if reader.fieldnames:
             reader.fieldnames = [name.strip() for name in reader.fieldnames]
 
-        logs = []
-        for row in reader:
-            email = row.get('email')
-            # Fallback for email if empty (some logs might be IP only)
-            if not email:
-                continue
-                
-            created_at_str = row.get('created_at')
-            created_at = timezone.now()
-            if created_at_str:
-                parsed_date = parse_datetime(created_at_str)
-                if parsed_date:
-                    created_at = parsed_date
+        try:
+            logs = []
+            for row in reader:
+                email = row.get('email')
+                # Fallback for email if empty (some logs might be IP only)
+                if not email:
+                    continue
+                    
+                created_at_str = row.get('created_at')
+                created_at = timezone.now()
+                if created_at_str:
+                    parsed_date = parse_datetime(created_at_str)
+                    if parsed_date:
+                        created_at = parsed_date
 
-            logs.append(SecurityLog(
-                email=email,
-                ip_address=row.get('ip_address'),
-                user_agent=row.get('user_agent'),
-                input_details=row.get('input_details'),
-                attempt_status=row.get('status'), # Map CSV 'status' to attempt_status
-                created_at=created_at
-            ))
-            
-        if logs:
-            SecurityLog.objects.bulk_create(logs)
-            
-        return Response({'message': f'Imported {len(logs)} logs successfully'})
+                logs.append(SecurityLog(
+                    email=email,
+                    ip_address=row.get('ip_address'),
+                    user_agent=row.get('user_agent'),
+                    input_details=row.get('input_details'),
+                    attempt_status=row.get('status'), # Map CSV 'status' to attempt_status
+                    created_at=created_at
+                ))
+                
+            if logs:
+                SecurityLog.objects.bulk_create(logs)
+                
+            return Response({'message': f'Imported {len(logs)} logs successfully'})
+        except Exception as e:
+            return Response({'error': f'Import failed: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class SecurityLogAnalyticsView(APIView):
     def get(self, request):
