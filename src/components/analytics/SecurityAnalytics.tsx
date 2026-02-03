@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Upload, Activity, Trash2, AlertTriangle, Shield, CheckCircle, FileUp } from 'lucide-react';
 import { API_URL } from '@/lib/api';
@@ -23,7 +24,7 @@ export const SecurityAnalytics = () => {
 
     const fetchStats = async () => {
         try {
-            const res = await fetch(`${API_URL}/api/security/stats`);
+            const res = await fetch(`${API_URL}/security/stats`);
             const data = await res.json();
             setLogs(data.recent_logs);
             setStats(data);
@@ -45,19 +46,26 @@ export const SecurityAnalytics = () => {
 
         setUploading(true);
         try {
-            const response = await fetch(`${API_URL}/api/security/import`, {
+            const response = await fetch(`${API_URL}/security/import`, {
                 method: 'POST',
                 body: formData,
             });
+
             if (response.ok) {
+                const data = await response.json();
+                toast.success(data.message || 'Import successful');
                 fetchStats();
                 // Reset input
                 event.target.value = '';
             } else {
-                console.error('Upload failed');
+                const errorData = await response.json().catch(() => ({}));
+                const errorMessage = errorData.error || 'Upload failed';
+                console.error('Upload failed:', errorMessage);
+                toast.error(errorMessage);
             }
         } catch (error) {
             console.error('Upload error', error);
+            toast.error('Network error occurred during upload');
         } finally {
             setUploading(false);
         }
@@ -66,7 +74,7 @@ export const SecurityAnalytics = () => {
     const handleDelete = async (id: string) => {
         if (!confirm('Are you sure you want to delete this log?')) return;
         try {
-            const response = await fetch(`${API_URL}/api/security/log/${id}`, {
+            const response = await fetch(`${API_URL}/security/log/${id}`, {
                 method: 'DELETE',
             });
             if (response.ok) {
@@ -79,7 +87,7 @@ export const SecurityAnalytics = () => {
 
     const handleStatusUpdate = async (id: string, newStatus: string) => {
         try {
-            const response = await fetch(`${API_URL}/api/security/log/${id}`, {
+            const response = await fetch(`${API_URL}/security/log/${id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ review_status: newStatus })
@@ -110,8 +118,8 @@ export const SecurityAnalytics = () => {
                             <span className="text-sm font-medium">Export</span>
                         </button>
                         <div className="absolute right-0 mt-2 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                            <a href={`${API_URL}/api/security/export?type=csv`} target="_blank" rel="noreferrer" className="block px-4 py-2 hover:bg-slate-700 text-sm text-slate-300">Download CSV</a>
-                            <a href={`${API_URL}/api/security/export?type=pdf`} target="_blank" rel="noreferrer" className="block px-4 py-2 hover:bg-slate-700 text-sm text-slate-300">Download PDF</a>
+                            <a href={`${API_URL}/security/export?type=csv`} target="_blank" rel="noreferrer" className="block px-4 py-2 hover:bg-slate-700 text-sm text-slate-300">Download CSV</a>
+                            <a href={`${API_URL}/security/export?type=pdf`} target="_blank" rel="noreferrer" className="block px-4 py-2 hover:bg-slate-700 text-sm text-slate-300">Download PDF</a>
                         </div>
                     </div>
                     <div className="relative">
