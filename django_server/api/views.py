@@ -567,6 +567,7 @@ from django.http import HttpResponse
 from rest_framework.permissions import AllowAny
 
 class StatsExportView(APIView):
+    authentication_classes = []
     permission_classes = [AllowAny]
     def get(self, request):
         export_type = request.query_params.get('type', 'csv')
@@ -659,6 +660,7 @@ class StatsExportView(APIView):
         return Response({'error': 'Invalid type'}, status=400)
 
 class SecurityLogExportView(APIView):
+    authentication_classes = []
     permission_classes = [AllowAny]
     def get(self, request):
         export_type = request.query_params.get('type', 'csv')
