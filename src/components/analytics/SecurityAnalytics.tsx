@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Upload, Activity, Trash2, AlertTriangle, Shield, CheckCircle, FileUp } from 'lucide-react';
-import { API_URL } from '@/lib/api';
+import api, { API_URL } from '@/lib/api';
 
 interface SecurityLog {
     id: string;
@@ -24,12 +24,13 @@ export const SecurityAnalytics = () => {
 
     const fetchStats = async () => {
         try {
-            const res = await fetch(`${API_URL}/security/stats`);
-            const data = await res.json();
-            setLogs(data.recent_logs);
-            setStats(data);
+            const res = await api.get('/security/stats');
+            setLogs(res.data.recent_logs || []);
+            setStats(res.data);
         } catch (error) {
             console.error('Fetch stats failed', error);
+            // Initialize with empty array to prevent crashes
+            setLogs([]);
         }
     };
 
@@ -46,26 +47,24 @@ export const SecurityAnalytics = () => {
 
         setUploading(true);
         try {
-            const response = await fetch(`${API_URL}/security/import`, {
-                method: 'POST',
-                body: formData,
+            // Note: For file uploads we might need to manually set content-type header to undefined 
+            // to let browser set multipart boundary, but axios usually handles it.
+            // Using api instance to ensure auth headers are present.
+            const response = await api.post('/security/import', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
             });
 
-            if (response.ok) {
-                const data = await response.json();
-                toast.success(data.message || 'Import successful');
+            if (response.status === 200) {
+                toast.success(response.data.message || 'Import successful');
                 fetchStats();
-                // Reset input
                 event.target.value = '';
-            } else {
-                const errorData = await response.json().catch(() => ({}));
-                const errorMessage = errorData.error || 'Upload failed';
-                console.error('Upload failed:', errorMessage);
-                toast.error(errorMessage);
             }
-        } catch (error) {
-            console.error('Upload error', error);
-            toast.error('Network error occurred during upload');
+        } catch (error: any) {
+            const errorMessage = error.response?.data?.error || 'Upload failed';
+            console.error('Upload failed:', errorMessage);
+            toast.error(errorMessage);
         } finally {
             setUploading(false);
         }
@@ -74,34 +73,26 @@ export const SecurityAnalytics = () => {
     const handleDelete = async (id: string) => {
         if (!confirm('Are you sure you want to delete this log?')) return;
         try {
-            const response = await fetch(`${API_URL}/security/log/${id}`, {
-                method: 'DELETE',
-            });
-            if (response.ok) {
-                fetchStats(); // Refresh
-            }
+            await api.delete(`/security/log/${id}`);
+            fetchStats(); // Refresh
         } catch (error) {
             console.error('Delete failed', error);
+            toast.error('Failed to delete log');
         }
     };
 
     const handleStatusUpdate = async (id: string, newStatus: string) => {
         try {
-            const response = await fetch(`${API_URL}/security/log/${id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ review_status: newStatus })
-            });
-            if (response.ok) {
-                fetchStats(); // Refresh
-            }
+            await api.patch(`/security/log/${id}`, { review_status: newStatus });
+            fetchStats(); // Refresh
         } catch (error) {
             console.error('Update failed', error);
+            toast.error('Failed to update status');
         }
     };
 
     // Filter logs
-    const filteredLogs = logs.filter(log => {
+    const filteredLogs = (logs || []).filter(log => {
         if (filterStatus === 'all') return true;
         return log.review_status === filterStatus;
     });

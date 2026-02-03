@@ -18,7 +18,7 @@ chmod 664 db.sqlite3
 chmod 775 .
 
 # Restart services
-systemctl restart gunicorn
+systemctl restart mail-muse
 systemctl restart nginx
 
 echo "Permissions fixed and services restarted."
