@@ -7,6 +7,7 @@ from rest_framework import status
 from django.db import transaction
 from django.db.models import Sum, Count, Q, F
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from .models import MailConfig, EmailRecipient, EmailTemplate, EmailCampaign, EmailLog
 from .serializers import MailConfigSerializer, EmailRecipientSerializer, EmailTemplateSerializer, EmailCampaignSerializer, EmailLogSerializer
 from .utils.mailer import process_campaign, send_email, process_template_variables
@@ -152,6 +153,8 @@ class CampaignDetailView(APIView):
             return Response(status=status.HTTP_204_NO_CONTENT)
         except EmailCampaign.DoesNotExist:
             return Response({'error': 'Campaign not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class CampaignStatusView(APIView):
     def patch(self, request, pk):
@@ -352,13 +355,20 @@ class SecurityLogImportView(APIView):
             if not email:
                 continue
                 
+            created_at_str = row.get('created_at')
+            created_at = timezone.now()
+            if created_at_str:
+                parsed_date = parse_datetime(created_at_str)
+                if parsed_date:
+                    created_at = parsed_date
+
             logs.append(SecurityLog(
                 email=email,
                 ip_address=row.get('ip_address'),
                 user_agent=row.get('user_agent'),
                 input_details=row.get('input_details'),
                 attempt_status=row.get('status'), # Map CSV 'status' to attempt_status
-                created_at=row.get('created_at', timezone.now())
+                created_at=created_at
             ))
             
         if logs:
