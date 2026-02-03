@@ -564,7 +564,10 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
 from reportlab.lib.styles import getSampleStyleSheet
 from django.http import HttpResponse
 
+from rest_framework.permissions import AllowAny
+
 class StatsExportView(APIView):
+    permission_classes = [AllowAny]
     def get(self, request):
         export_type = request.query_params.get('type', 'csv')
         campaign_id = request.query_params.get('campaign_id')
@@ -656,6 +659,7 @@ class StatsExportView(APIView):
         return Response({'error': 'Invalid type'}, status=400)
 
 class SecurityLogExportView(APIView):
+    permission_classes = [AllowAny]
     def get(self, request):
         export_type = request.query_params.get('type', 'csv')
         status_filter = request.query_params.get('status')
