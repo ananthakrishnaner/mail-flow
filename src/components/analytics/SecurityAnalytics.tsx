@@ -2,7 +2,11 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Upload, Activity, Trash2, AlertTriangle, Shield, CheckCircle, FileUp } from 'lucide-react';
+import { Upload, Activity, Trash2, AlertTriangle, Shield, CheckCircle, FileUp, X, CheckSquare, Square, Search, Calendar, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
+import {
+    AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
+    PieChart, Pie, Cell, Legend
+} from 'recharts';
 import api, { API_URL } from '@/lib/api';
 
 interface SecurityLog {
@@ -16,17 +20,48 @@ interface SecurityLog {
     review_status: string;
 }
 
+interface PaginationState {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+}
+
 export const SecurityAnalytics = () => {
     const [logs, setLogs] = useState<SecurityLog[]>([]);
     const [uploading, setUploading] = useState(false);
     const [filterStatus, setFilterStatus] = useState<string>('all');
     const [stats, setStats] = useState<any>(null);
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+    const [clearConfirmationCount, setClearConfirmationCount] = useState(0);
+
+    // Search & Pagination
+    const [searchQuery, setSearchQuery] = useState('');
+    const [dateFilter, setDateFilter] = useState('');
+    const [pagination, setPagination] = useState<PaginationState>({
+        page: 1,
+        limit: 1000,
+        total: 0,
+        pages: 1
+    });
+
+    const COLORS = ['#ef4444', '#10b981', '#f59e0b', '#3b82f6'];
 
     const fetchStats = async () => {
         try {
-            const res = await api.get('/security/stats');
+            const params = new URLSearchParams();
+            params.append('page', pagination.page.toString());
+            params.append('limit', pagination.limit.toString());
+            if (searchQuery) params.append('search', searchQuery);
+            if (dateFilter) params.append('date', dateFilter);
+
+            const res = await api.get(`/security/stats?${params.toString()}`);
             setLogs(res.data.recent_logs || []);
             setStats(res.data);
+            if (res.data.pagination) {
+                setPagination(prev => ({ ...prev, ...res.data.pagination }));
+            }
         } catch (error) {
             console.error('Fetch stats failed', error);
             // Initialize with empty array to prevent crashes
@@ -35,8 +70,11 @@ export const SecurityAnalytics = () => {
     };
 
     useEffect(() => {
-        fetchStats();
-    }, []);
+        const timer = setTimeout(() => {
+            fetchStats();
+        }, 300); // Debounce search
+        return () => clearTimeout(timer);
+    }, [pagination.page, searchQuery, dateFilter]);
 
     const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -91,8 +129,84 @@ export const SecurityAnalytics = () => {
         }
     };
 
-    // Filter logs
-    const filteredLogs = (logs || []).filter(log => {
+    const toggleSelectAll = () => {
+        if (selectedIds.size === filteredLogs.length) {
+            setSelectedIds(new Set());
+        } else {
+            setSelectedIds(new Set(filteredLogs.map(l => l.id)));
+        }
+    };
+
+    const toggleSelect = (id: string) => {
+        const newSelected = new Set(selectedIds);
+        if (newSelected.has(id)) {
+            newSelected.delete(id);
+        } else {
+            newSelected.add(id);
+        }
+        setSelectedIds(newSelected);
+    };
+
+    const toggleExpand = (id: string) => {
+        const newExpanded = new Set(expandedRows);
+        if (newExpanded.has(id)) {
+            newExpanded.delete(id);
+        } else {
+            newExpanded.add(id);
+        }
+        setExpandedRows(newExpanded);
+    };
+
+    const handleBulkDelete = async () => {
+        if (!confirm(`Delete ${selectedIds.size} logs?`)) return;
+        try {
+            await api.post('/security/bulk', {
+                action: 'delete_selected',
+                ids: Array.from(selectedIds)
+            });
+            setSelectedIds(new Set());
+            fetchStats();
+            toast.success('Logs deleted');
+        } catch (error) {
+            toast.error('Bulk delete failed');
+        }
+    };
+
+    const handleBulkStatusUpdate = async (status: string) => {
+        try {
+            await api.post('/security/bulk', {
+                action: 'update_status',
+                ids: Array.from(selectedIds),
+                status
+            });
+            setSelectedIds(new Set());
+            fetchStats();
+            toast.success('Status updated');
+        } catch (error) {
+            toast.error('Bulk update failed');
+        }
+    };
+
+    const handleClearAll = async () => {
+        if (clearConfirmationCount < 2) {
+            setClearConfirmationCount(prev => prev + 1);
+            toast.warning(`Click ${3 - (clearConfirmationCount + 1)} more times to confirm clearing ALL logs`);
+            return;
+        }
+
+        try {
+            await api.post('/security/bulk', { action: 'delete_all' });
+            setClearConfirmationCount(0);
+            fetchStats();
+            toast.success('All logs cleared');
+        } catch (error) {
+            toast.error('Clear all failed');
+            setClearConfirmationCount(0);
+        }
+    };
+
+    // Client-side status filter (applied on current page)
+    const filteredLogs = logs.filter(log => {
         if (filterStatus === 'all') return true;
         return log.review_status === filterStatus;
     });
@@ -170,18 +284,166 @@ export const SecurityAnalytics = () => {
                 </Card>
             </div>
 
-            {/* Filters */}
-            <div className="flex gap-2">
-                <select
-                    className="p-2 border rounded-lg bg-zinc-900 border-zinc-800 text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent outline-none transition-all"
-                    value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value)}
+            {/* Charts Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <Card className="lg:col-span-2 bg-zinc-900/50 border-zinc-800 backdrop-blur-sm p-4">
+                    <CardHeader>
+                        <CardTitle className="text-zinc-400 text-sm font-medium">Activity Timeline (7 Days)</CardTitle>
+                    </CardHeader>
+                    <div className="h-[300px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={stats?.timeline_data || []}>
+                                <defs>
+                                    <linearGradient id="colorFailure" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
+                                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                                    </linearGradient>
+                                    <linearGradient id="colorSuccess" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.5} />
+                                <XAxis dataKey="date" stroke="#9ca3af" fontSize={12} />
+                                <YAxis stroke="#9ca3af" fontSize={12} />
+                                <RechartsTooltip
+                                    contentStyle={{ backgroundColor: '#18181b', border: '1px solid #27272a' }}
+                                    itemStyle={{ color: '#e5e7eb' }}
+                                />
+                                <Legend />
+                                <Area type="monotone" dataKey="failure" stroke="#ef4444" fillOpacity={1} fill="url(#colorFailure)" name="Failed Attempts" />
+                                <Area type="monotone" dataKey="success" stroke="#10b981" fillOpacity={1} fill="url(#colorSuccess)" name="Successful Access" />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+                </Card>
+
+                <Card className="bg-zinc-900/50 border-zinc-800 backdrop-blur-sm p-4">
+                    <CardHeader>
+                        <CardTitle className="text-zinc-400 text-sm font-medium">Status Distribution</CardTitle>
+                    </CardHeader>
+                    <div className="h-[300px] w-full flex items-center justify-center">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie
+                                    data={stats?.status_distribution || []}
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={60}
+                                    outerRadius={80}
+                                    paddingAngle={5}
+                                    dataKey="count"
+                                    nameKey="attempt_status"
+                                >
+                                    {(stats?.status_distribution || []).map((entry: any, index: number) => (
+                                        <Cell key={`cell-${index}`} fill={entry.attempt_status === 'failure' ? '#ef4444' : '#10b981'} />
+                                    ))}
+                                </Pie>
+                                <RechartsTooltip contentStyle={{ backgroundColor: '#18181b', border: '1px solid #27272a' }} />
+                                <Legend />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </div>
+                </Card>
+            </div>
+
+            {/* Search & Pagination Controls */}
+            <div className="flex flex-col md:flex-row justify-between gap-4 bg-zinc-950/50 p-4 rounded-xl border border-zinc-800 backdrop-blur-sm">
+                <div className="flex flex-1 gap-2">
+                    <div className="relative flex-1 max-w-md">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={16} />
+                        <input
+                            type="text"
+                            placeholder="Search email, IP, details..."
+                            className="w-full pl-10 pr-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-white placeholder:text-zinc-600 focus:ring-2 focus:ring-cyan-500/50 outline-none transition-all"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                    </div>
+                    <div className="relative">
+                        <input
+                            type="date"
+                            className="pl-4 pr-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-white focus:ring-2 focus:ring-cyan-500/50 outline-none transition-all [color-scheme:dark]"
+                            value={dateFilter}
+                            onChange={(e) => setDateFilter(e.target.value)}
+                        />
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => setPagination(p => ({ ...p, page: Math.max(1, p.page - 1) }))}
+                        disabled={pagination.page === 1}
+                        className="p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    >
+                        <ChevronLeft size={16} />
+                    </button>
+                    <span className="text-sm text-zinc-400 font-medium px-2">
+                        Page {pagination.page} of {Math.max(1, pagination.pages)}
+                    </span>
+                    <button
+                        onClick={() => setPagination(p => ({ ...p, page: Math.min(pagination.pages, p.page + 1) }))}
+                        disabled={pagination.page >= pagination.pages}
+                        className="p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    >
+                        <ChevronRight size={16} />
+                    </button>
+                </div>
+            </div>
+
+            {/* Filters & Bulk Actions */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div className="flex gap-2">
+                    <select
+                        className="p-2 border rounded-lg bg-zinc-950 border-zinc-800 text-white focus:ring-2 focus:ring-cyan-900/50 focus:border-zinc-700 outline-none transition-all"
+                        value={filterStatus}
+                        onChange={(e) => setFilterStatus(e.target.value)}
+                    >
+                        <option value="all">All Statuses</option>
+                        <option value="unreviewed">Unreviewed</option>
+                        <option value="reviewed">Reviewed</option>
+                        <option value="false_positive">False Positive</option>
+                    </select>
+                </div>
+
+                {/* Bulk Actions Bar */}
+                {selectedIds.size > 0 && (
+                    <div className="flex items-center gap-4 p-2 bg-blue-900/20 border border-blue-500/30 rounded-lg animate-in fade-in slide-in-from-top-2">
+                        <span className="text-blue-400 text-sm font-medium">{selectedIds.size} selected</span>
+                        <div className="flex gap-2">
+                            <select
+                                className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm text-zinc-300 outline-none"
+                                onChange={(e) => {
+                                    if (e.target.value) handleBulkStatusUpdate(e.target.value);
+                                    e.target.value = '';
+                                }}
+                            >
+                                <option value="">Set Status...</option>
+                                <option value="reviewed">Mark Reviewed</option>
+                                <option value="unreviewed">Mark Unreviewed</option>
+                                <option value="false_positive">Mark False Positive</option>
+                            </select>
+                            <button
+                                onClick={handleBulkDelete}
+                                className="flex items-center gap-2 px-3 py-1 bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded text-sm transition-colors"
+                            >
+                                <Trash2 size={14} /> Delete
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Clear All Button */}
+                <button
+                    onClick={handleClearAll}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ml-auto ${clearConfirmationCount > 0
+                        ? 'bg-red-600 text-white animate-pulse'
+                        : 'bg-zinc-800 text-zinc-400 hover:bg-red-900/30 hover:text-red-400'
+                        }`}
                 >
-                    <option value="all">All Statuses</option>
-                    <option value="unreviewed">Unreviewed</option>
-                    <option value="reviewed">Reviewed</option>
-                    <option value="false_positive">False Positive</option>
-                </select>
+                    <Trash2 size={16} />
+                    {clearConfirmationCount === 0 ? 'Clear All Logs' : `Confirm Clear (${3 - clearConfirmationCount} clicks left)`}
+                </button>
             </div>
 
             {/* Table */}
@@ -190,6 +452,12 @@ export const SecurityAnalytics = () => {
                     <table className="w-full text-left text-zinc-300">
                         <thead className="bg-zinc-950/50 text-zinc-400 uppercase text-xs tracking-wider">
                             <tr>
+                                <th className="p-4 w-[50px]">
+                                    <button onClick={toggleSelectAll} className="text-zinc-400 hover:text-white">
+                                        {selectedIds.size === filteredLogs.length && filteredLogs.length > 0 ? <CheckSquare size={18} /> : <Square size={18} />}
+                                    </button>
+                                </th>
+                                <th className="p-4 w-[40px]"></th>
                                 <th className="p-4">Time</th>
                                 <th className="p-4">Email</th>
                                 <th className="p-4">IP Address</th>
@@ -201,49 +469,116 @@ export const SecurityAnalytics = () => {
                         </thead>
                         <tbody className="divide-y divide-zinc-800/50">
                             {filteredLogs.map(log => (
-                                <tr key={log.id} className="hover:bg-zinc-800/30 transition-colors">
-                                    <td className="p-4 text-sm whitespace-nowrap text-zinc-400">
-                                        {new Date(log.created_at).toLocaleString()}
-                                    </td>
-                                    <td className="p-4 font-medium text-white">{log.email}</td>
-                                    <td className="p-4 font-mono text-sm text-cyan-400">{log.ip_address}</td>
-                                    <td className="p-4 text-sm text-slate-300 max-w-[200px] truncate" title={log.input_details}>{log.input_details || '-'}</td>
-                                    <td className="p-4">
-                                        <span className={`px-2 py-1 rounded-full text-xs font-medium border ${log.attempt_status === 'failure'
-                                            ? 'bg-red-500/20 text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(248,113,113,0.2)]'
-                                            : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 shadow-[0_0_10px_rgba(52,211,153,0.2)]'
-                                            }`}>
-                                            {log.attempt_status === 'failure' ? 'Failed Attempt' : 'Success'}
-                                        </span>
-                                    </td>
-                                    <td className="p-4">
-                                        <select
-                                            className={`bg-transparent border rounded px-2 py-1 text-xs font-medium outline-none transition-all cursor-pointer ${log.review_status === 'unreviewed' ? 'border-amber-500/30 text-amber-400 bg-amber-500/5 hover:bg-amber-500/10' :
-                                                log.review_status === 'reviewed' ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/10' :
-                                                    'border-zinc-700 text-zinc-400 bg-zinc-800/50 hover:bg-zinc-800'
-                                                }`}
-                                            value={log.review_status}
-                                            onChange={(e) => handleStatusUpdate(log.id, e.target.value)}
-                                        >
-                                            <option value="unreviewed" className="bg-zinc-900 text-amber-400">Unreviewed</option>
-                                            <option value="reviewed" className="bg-zinc-900 text-emerald-400">Reviewed</option>
-                                            <option value="false_positive" className="bg-zinc-900 text-zinc-400">False Positive</option>
-                                        </select>
-                                    </td>
-                                    <td className="p-4 text-right">
-                                        <button
-                                            onClick={() => handleDelete(log.id)}
-                                            className="p-2 hover:bg-red-500/10 text-zinc-500 hover:text-red-400 rounded-lg transition-all"
-                                            title="Delete Log"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
-                                    </td>
-                                </tr>
+                                <>
+                                    <tr
+                                        key={log.id}
+                                        onClick={(e) => {
+                                            // Prevent expansion when clicking checkbox, select, or buttons
+                                            if ((e.target as HTMLElement).closest('button, select, input')) return;
+                                            toggleExpand(log.id);
+                                        }}
+                                        className={`transition-colors cursor-pointer ${selectedIds.has(log.id) ? 'bg-blue-500/10 hover:bg-blue-500/20' : 'hover:bg-zinc-800/30'
+                                            } ${expandedRows.has(log.id) ? 'bg-zinc-800/50' : ''}`}
+                                    >
+                                        <td className="p-4">
+                                            <button onClick={() => toggleSelect(log.id)} className={`transition-colors ${selectedIds.has(log.id) ? 'text-blue-400' : 'text-zinc-600 hover:text-zinc-400'}`}>
+                                                {selectedIds.has(log.id) ? <CheckSquare size={18} /> : <Square size={18} />}
+                                            </button>
+                                        </td>
+                                        <td className="p-4 text-zinc-500">
+                                            {expandedRows.has(log.id) ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                        </td>
+                                        <td className="p-4 text-sm whitespace-nowrap text-zinc-400">
+                                            {new Date(log.created_at).toLocaleString()}
+                                        </td>
+                                        <td className="p-4 font-medium text-white">{log.email}</td>
+                                        <td className="p-4 font-mono text-sm text-cyan-400">{log.ip_address}</td>
+                                        <td className="p-4 text-sm text-slate-300 max-w-[200px] truncate" title={log.input_details}>{log.input_details || '-'}</td>
+                                        <td className="p-4">
+                                            <span className={`px-2 py-1 rounded-full text-xs font-medium border ${log.attempt_status === 'failure'
+                                                ? 'bg-red-500/20 text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(248,113,113,0.2)]'
+                                                : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 shadow-[0_0_10px_rgba(52,211,153,0.2)]'
+                                                }`}>
+                                                {log.attempt_status === 'failure' ? 'Failed Attempt' : 'Success'}
+                                            </span>
+                                        </td>
+                                        <td className="p-4">
+                                            <select
+                                                className={`bg-transparent border rounded px-2 py-1 text-xs font-medium outline-none transition-all cursor-pointer ${log.review_status === 'unreviewed' ? 'border-amber-500/30 text-amber-400 bg-amber-500/5 hover:bg-amber-500/10' :
+                                                    log.review_status === 'reviewed' ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/10' :
+                                                        'border-zinc-700 text-zinc-400 bg-zinc-800/50 hover:bg-zinc-800'
+                                                    }`}
+                                                value={log.review_status}
+                                                onChange={(e) => handleStatusUpdate(log.id, e.target.value)}
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <option value="unreviewed" className="bg-zinc-900 text-amber-400">Unreviewed</option>
+                                                <option value="reviewed" className="bg-zinc-900 text-emerald-400">Reviewed</option>
+                                                <option value="false_positive" className="bg-zinc-900 text-zinc-400">False Positive</option>
+                                            </select>
+                                        </td>
+                                        <td className="p-4 text-right">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); handleDelete(log.id); }}
+                                                className="p-2 hover:bg-red-500/10 text-zinc-500 hover:text-red-400 rounded-lg transition-all"
+                                                title="Delete Log"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {expandedRows.has(log.id) && (
+                                        <tr className="bg-zinc-900/40 border-t border-zinc-800/50 animate-in fade-in slide-in-from-top-1">
+                                            <td colSpan={9} className="p-6">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                    <div className="space-y-4">
+                                                        <div>
+                                                            <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1">User Agent</h4>
+                                                            <p className="text-sm text-zinc-300 font-mono bg-zinc-950/50 p-3 rounded border border-zinc-800 break-all">{log.user_agent}</p>
+                                                        </div>
+                                                        <div>
+                                                            <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1">Input Details</h4>
+                                                            <p className="text-sm text-zinc-300 font-mono bg-zinc-950/50 p-3 rounded border border-zinc-800 whitespace-pre-wrap">{log.input_details}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="space-y-4">
+                                                        <div className="flex gap-4">
+                                                            <div>
+                                                                <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1">IP Address</h4>
+                                                                <p className="text-sm text-cyan-400 font-mono">{log.ip_address}</p>
+                                                            </div>
+                                                            <div>
+                                                                <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1">Timestamp</h4>
+                                                                <p className="text-sm text-zinc-300">{new Date(log.created_at).toLocaleString()}</p>
+                                                            </div>
+                                                        </div>
+                                                        <div>
+                                                            <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1">Status</h4>
+                                                            <div className="flex gap-2">
+                                                                <span className={`px-2 py-1 rounded text-xs font-medium border ${log.attempt_status === 'failure'
+                                                                    ? 'bg-red-500/10 text-red-400 border-red-500/20'
+                                                                    : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                                                    }`}>
+                                                                    Attempt: {log.attempt_status}
+                                                                </span>
+                                                                <span className={`px-2 py-1 rounded text-xs font-medium border ${log.review_status === 'unreviewed' ? 'border-amber-500/30 text-amber-400 bg-amber-500/5' :
+                                                                    log.review_status === 'reviewed' ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/5' :
+                                                                        'border-zinc-700 text-zinc-400 bg-zinc-800/50'
+                                                                    }`}>
+                                                                    Review: {log.review_status.replace('_', ' ')}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
+                                </>
                             ))}
                             {filteredLogs.length === 0 && (
                                 <tr>
-                                    <td colSpan={7} className="p-8 text-center text-slate-500">
+                                    <td colSpan={9} className="p-8 text-center text-slate-500">
                                         No logs found matching filter.
                                     </td>
                                 </tr>

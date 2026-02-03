@@ -7,7 +7,7 @@ from .views import (
     CampaignLogsView, StatsSummaryView,
     TestEmailView, TrackEmailView, RecentActivityView,
     SecurityLogImportView, SecurityLogAnalyticsView, SecurityLogActionView,
-    StatsExportView, SecurityLogExportView
+    StatsExportView, SecurityLogExportView, SecurityLogBulkView
 )
 
 urlpatterns = [
@@ -36,4 +36,5 @@ urlpatterns = [
     path('security/log/<str:pk>', SecurityLogActionView.as_view()),
     path('stats/export', StatsExportView.as_view()),
     path('security/export', SecurityLogExportView.as_view()),
+    path('security/bulk', SecurityLogBulkView.as_view()),
 ]

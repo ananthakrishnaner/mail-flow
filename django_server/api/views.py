@@ -382,6 +382,32 @@ class SecurityLogImportView(APIView):
         except Exception as e:
             return Response({'error': f'Import failed: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class SecurityLogBulkView(APIView):
+    def post(self, request):
+        action = request.data.get('action')
+        
+        if action == 'delete_all':
+            count, _ = SecurityLog.objects.all().delete()
+            return Response({'message': f'Deleted {count} logs'})
+            
+        elif action == 'delete_selected':
+            ids = request.data.get('ids', [])
+            count, _ = SecurityLog.objects.filter(id__in=ids).delete()
+            return Response({'message': f'Deleted {count} logs'})
+            
+        elif action == 'update_status':
+            ids = request.data.get('ids', [])
+            new_status = request.data.get('status')
+            if not new_status:
+                return Response({'error': 'Status required'}, status=400)
+            count = SecurityLog.objects.filter(id__in=ids).update(review_status=new_status)
+            return Response({'message': f'Updated {count} logs'})
+            
+        return Response({'error': 'Invalid action'}, status=400)
+
 class SecurityLogAnalyticsView(APIView):
     def get(self, request):
         try:
@@ -389,9 +415,63 @@ class SecurityLogAnalyticsView(APIView):
             top_ips = list(SecurityLog.objects.values('ip_address')
                 .annotate(count=Count('ip_address'))
                 .order_by('-count')[:5])
+            
+            # Status Distribution for Pie Chart
+            status_dist = list(SecurityLog.objects.values('attempt_status')
+                .annotate(count=Count('id'))
+                .order_by('-count'))
                 
-            # Recent logs for table
-            recent_logs = SecurityLog.objects.all()[:100] # Increased limit
+            # Timeline data for Scaler Graph (Area/Line) - Last 7 Days
+            # SQLite doesn't support TruncDate easily in all versions, but basic date grouping works
+            # Using raw SQL or Python aggregation might be safer if DB is simple, but let's try ORM first
+            # Simplification: Fetch date and count in python to avoid DB complexity issues with sqlite date functions
+            from django.utils import timezone
+            import datetime
+            last_week = timezone.now() - datetime.timedelta(days=7)
+            timeline_logs = SecurityLog.objects.filter(created_at__gte=last_week).values('created_at', 'attempt_status')
+            
+            # Aggregate in python
+            date_counts = {}
+            for log in timeline_logs:
+                date_str = log['created_at'].strftime('%Y-%m-%d')
+                status = log['attempt_status'] or 'unknown'
+                if date_str not in date_counts:
+                    date_counts[date_str] = {'date': date_str, 'success': 0, 'failure': 0}
+                
+                if status == 'success':
+                    date_counts[date_str]['success'] += 1
+                elif status == 'failure':
+                    date_counts[date_str]['failure'] += 1
+                    
+            timeline_data = sorted(list(date_counts.values()), key=lambda x: x['date'])
+
+            # Filters and Pagination
+            page = int(request.query_params.get('page', 1))
+            limit = int(request.query_params.get('limit', 1000))
+            search_query = request.query_params.get('search', '').lower()
+            date_filter = request.query_params.get('date', '')
+            
+            logs_query = SecurityLog.objects.all().order_by('-created_at')
+            
+            if search_query:
+                logs_query = logs_query.filter(
+                    Q(email__icontains=search_query) | 
+                    Q(ip_address__icontains=search_query) |
+                    Q(input_details__icontains=search_query)
+                )
+                
+            if date_filter:
+                try:
+                    search_date = timezone.datetime.strptime(date_filter, '%Y-%m-%d').date()
+                    logs_query = logs_query.filter(created_at__date=search_date)
+                except ValueError:
+                    pass
+
+            total_logs = logs_query.count()
+            start = (page - 1) * limit
+            end = start + limit
+            recent_logs = logs_query[start:end]
+            
             logs_data = [{
                 'id': log.id,
                 'email': log.email,
@@ -405,7 +485,15 @@ class SecurityLogAnalyticsView(APIView):
             
             return Response({
                 'top_ips': top_ips,
-                'recent_logs': logs_data
+                'status_distribution': status_dist,
+                'timeline_data': timeline_data,
+                'recent_logs': logs_data,
+                'pagination': {
+                    'total': total_logs,
+                    'page': page,
+                    'limit': limit,
+                    'pages': (total_logs + limit - 1) // limit
+                }
             })
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
