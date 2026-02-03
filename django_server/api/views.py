@@ -387,26 +387,34 @@ class SecurityLogImportView(APIView):
 
 class SecurityLogBulkView(APIView):
     def post(self, request):
-        action = request.data.get('action')
-        
-        if action == 'delete_all':
-            count, _ = SecurityLog.objects.all().delete()
-            return Response({'message': f'Deleted {count} logs'})
+        try:
+            action = request.data.get('action')
+            print(f"DEBUG: Bulk action: {action}, Data: {request.data}")
             
-        elif action == 'delete_selected':
-            ids = request.data.get('ids', [])
-            count, _ = SecurityLog.objects.filter(id__in=ids).delete()
-            return Response({'message': f'Deleted {count} logs'})
+            if action == 'delete_all':
+                count, _ = SecurityLog.objects.all().delete()
+                return Response({'message': f'Deleted {count} logs'})
+                
+            elif action == 'delete_selected':
+                ids = request.data.get('ids', [])
+                count, _ = SecurityLog.objects.filter(id__in=ids).delete()
+                return Response({'message': f'Deleted {count} logs'})
+                
+            elif action == 'update_status':
+                ids = request.data.get('ids', [])
+                new_status = request.data.get('status')
+                if not new_status:
+                    return Response({'error': 'Status required'}, status=400)
+                
+                print(f"DEBUG: Updating {len(ids)} logs to {new_status}")
+                count = SecurityLog.objects.filter(id__in=ids).update(review_status=new_status)
+                return Response({'message': f'Updated {count} logs'})
+                
+            return Response({'error': 'Invalid action'}, status=400)
             
-        elif action == 'update_status':
-            ids = request.data.get('ids', [])
-            new_status = request.data.get('status')
-            if not new_status:
-                return Response({'error': 'Status required'}, status=400)
-            count = SecurityLog.objects.filter(id__in=ids).update(review_status=new_status)
-            return Response({'message': f'Updated {count} logs'})
-            
-        return Response({'error': 'Invalid action'}, status=400)
+        except Exception as e:
+            print(f"ERROR: Bulk action failed: {str(e)}")
+            return Response({'error': str(e)}, status=500)
 
 class SecurityLogAnalyticsView(APIView):
     def get(self, request):
