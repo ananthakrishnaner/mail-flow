@@ -182,42 +182,88 @@ def generate_campaign_pdf(campaign, sent_count, failed_count, failed_recipients)
     elements = []
     styles = getSampleStyleSheet()
     
-    # Title
-    elements.append(Paragraph(f"Campaign Report: {campaign.name}", styles['Title']))
-    elements.append(Spacer(1, 12))
+    # Custom Colors
+    PRIMARY_COLOR = colors.HexColor('#1e293b')
+    ACCENT_COLOR = colors.HexColor('#3b82f6')
+    SUCCESS_COLOR = colors.HexColor('#10b981')
+    FAIL_COLOR = colors.HexColor('#ef4444')
+    TEXT_COLOR = colors.HexColor('#334155')
     
-    # Summary
-    elements.append(Paragraph(f"<b>Status:</b> {campaign.status.upper()}", styles['Normal']))
-    elements.append(Paragraph(f"<b>Sent Successfully:</b> {sent_count}", styles['Normal']))
-    elements.append(Paragraph(f"<b>Failed:</b> {failed_count}", styles['Normal']))
-    elements.append(Paragraph(f"<b>Completed At:</b> {timezone.now().strftime('%Y-%m-%d %H:%M:%S')}", styles['Normal']))
-    elements.append(Spacer(1, 24))
+    # Title Section with Background
+    title_style = styles['Title']
+    title_style.textColor = PRIMARY_COLOR
+    title_style.fontSize = 24
+    title_style.alignment = 1 # Center
     
-    # Failed Emails Table
-    if failed_recipients:
-        elements.append(Paragraph("Failed Recipients Details", styles['Heading2']))
-        elements.append(Spacer(1, 12))
+    elements.append(Paragraph(f"MAIL MUSE", title_style))
+    elements.append(Paragraph(f"Campaign Performance Report", styles['Heading2']))
+    elements.append(Spacer(1, 20))
+    
+    # Campaign Details Box
+    elements.append(Paragraph(f"<b>Campaign Name:</b> {campaign.name}", styles['Normal']))
+    elements.append(Paragraph(f"<b>Date:</b> {timezone.now().strftime('%B %d, %Y at %I:%M %p')}", styles['Normal']))
+    elements.append(Spacer(1, 10))
+    
+    # Stats Visuals (Text based, as charts in PDF are hard without image lib)
+    stats_data = [
+        ['Total Sent', 'Successful', 'Failed'],
+        [str(sent_count + failed_count), str(sent_count), str(failed_count)]
+    ]
+    t_stats = Table(stats_data, colWidths=[150, 150, 150])
+    t_stats.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), PRIMARY_COLOR),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+        ('TOPPADDING', (0, 0), (-1, 0), 10),
         
-        data = [['Email', 'Error']]
+        ('TEXTCOLOR', (0, 1), (0, 1), TEXT_COLOR),
+        ('TEXTCOLOR', (1, 1), (1, 1), SUCCESS_COLOR),
+        ('TEXTCOLOR', (2, 1), (2, 1), FAIL_COLOR),
+        ('FONTSIZE', (0, 1), (-1, 1), 14),
+        ('FONTNAME', (0, 1), (-1, 1), 'Helvetica-Bold'),
+        ('BOTTOMPADDING', (0, 1), (-1, 1), 15),
+        ('TOPPADDING', (0, 1), (-1, 1), 15),
+        ('GRID', (0, 0), (-1, -1), 1, colors.Color(0.9, 0.9, 0.9))
+    ]))
+    elements.append(t_stats)
+    elements.append(Spacer(1, 30))
+    
+    # Failed Emails Section
+    if failed_recipients:
+        elements.append(Paragraph("Failed Deliveries Log", styles['Heading2']))
+        elements.append(Spacer(1, 10))
+        
+        data = [['Recipient', 'Error Reason']]
         for f in failed_recipients:
-            # Truncate error if too long
+            # Wrap error text
             err = str(f.get('error', 'Unknown'))
-            if len(err) > 50:
-                err = err[:47] + '...'
+            if len(err) > 60:
+                err = err[:57] + '...'
             data.append([f['email'], err])
             
         t = Table(data, colWidths=[200, 300])
         t.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.red),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('BACKGROUND', (0, 0), (-1, 0), FAIL_COLOR),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+            ('TOPPADDING', (0, 0), (-1, 0), 8),
+            
+            ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#fef2f2')),
+            ('GRID', (0, 0), (-1, -1), 0.5, FAIL_COLOR),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
         ]))
         elements.append(t)
     else:
-        elements.append(Paragraph("No failures recorded.", styles['Normal']))
+        # Success Message
+        success_style = styles['Normal']
+        success_style.textColor = SUCCESS_COLOR
+        success_style.fontSize = 12
+        elements.append(Paragraph("🎉 Perfect execution! No failed deliveries recorded.", success_style))
         
     doc.build(elements)
     buffer.seek(0)
