@@ -8,7 +8,7 @@ from django.db import transaction
 from django.db.models import Sum, Count, Q, F
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
-from .models import MailConfig, EmailRecipient, EmailTemplate, EmailCampaign, EmailLog
+from .models import MailConfig, EmailRecipient, EmailTemplate, EmailCampaign, EmailLog, SecurityLog
 from .serializers import MailConfigSerializer, EmailRecipientSerializer, EmailTemplateSerializer, EmailCampaignSerializer, EmailLogSerializer
 from .utils.mailer import process_campaign, send_email, process_template_variables
 import uuid
