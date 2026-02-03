@@ -428,20 +428,23 @@ class SecurityLogAnalyticsView(APIView):
             from django.utils import timezone
             import datetime
             last_week = timezone.now() - datetime.timedelta(days=7)
-            timeline_logs = SecurityLog.objects.filter(created_at__gte=last_week).values('created_at', 'attempt_status')
+            timeline_logs = SecurityLog.objects.filter(created_at__gte=last_week).values('created_at', 'input_details', 'email')
             
             # Aggregate in python
             date_counts = {}
             for log in timeline_logs:
                 date_str = log['created_at'].strftime('%Y-%m-%d')
-                status = log['attempt_status'] or 'unknown'
-                if date_str not in date_counts:
-                    date_counts[date_str] = {'date': date_str, 'success': 0, 'failure': 0}
+                has_input = bool(log.get('input_details'))
+                has_email = bool(log.get('email'))
                 
-                if status == 'success':
-                    date_counts[date_str]['success'] += 1
-                elif status == 'failure':
-                    date_counts[date_str]['failure'] += 1
+                if date_str not in date_counts:
+                    date_counts[date_str] = {'date': date_str, 'email_count': 0, 'input_count': 0}
+                
+                if has_email:
+                    date_counts[date_str]['email_count'] += 1
+                
+                if has_input:
+                    date_counts[date_str]['input_count'] += 1
                     
             timeline_data = sorted(list(date_counts.values()), key=lambda x: x['date'])
 
