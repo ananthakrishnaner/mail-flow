@@ -105,10 +105,10 @@ export const SecurityAnalytics = () => {
                 </h2>
                 <div className="flex gap-2">
                     <div className="relative group">
-                        <button className="flex items-center gap-2 px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 text-slate-300 transition-colors">
+                        <button className="flex items-center gap-2 px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg hover:bg-zinc-800 text-white transition-colors">
                             <span className="text-sm font-medium">Export</span>
                         </button>
-                        <div className="absolute right-0 mt-2 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                        <div className="absolute right-0 mt-2 w-40 bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
                             <a href={`${API_URL}/security/export?type=csv`} target="_blank" rel="noreferrer" className="block px-4 py-2 hover:bg-slate-700 text-sm text-slate-300">Download CSV</a>
                             <a href={`${API_URL}/security/export?type=pdf`} target="_blank" rel="noreferrer" className="block px-4 py-2 hover:bg-slate-700 text-sm text-slate-300">Download PDF</a>
                         </div>
@@ -124,7 +124,7 @@ export const SecurityAnalytics = () => {
                         <label
                             htmlFor="csv-upload"
                             className={`flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer transition-all duration-300 ${uploading
-                                ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
+                                ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
                                 : 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg hover:shadow-blue-500/25'
                                 }`}
                         >
@@ -137,7 +137,7 @@ export const SecurityAnalytics = () => {
 
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
+                <Card className="bg-zinc-900/50 border-zinc-800 backdrop-blur-sm">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium text-slate-400">Total Incidents</CardTitle>
                         <Shield className="h-4 w-4 text-cyan-400" />
@@ -146,7 +146,7 @@ export const SecurityAnalytics = () => {
                         <div className="text-2xl font-bold text-white">{logs.length}</div>
                     </CardContent>
                 </Card>
-                <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
+                <Card className="bg-zinc-900/50 border-zinc-800 backdrop-blur-sm">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium text-slate-400">Unreviewed</CardTitle>
                         <AlertTriangle className="h-4 w-4 text-amber-400" />
@@ -157,7 +157,7 @@ export const SecurityAnalytics = () => {
                         </div>
                     </CardContent>
                 </Card>
-                <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
+                <Card className="bg-zinc-900/50 border-zinc-800 backdrop-blur-sm">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium text-slate-400">Top Threat Source</CardTitle>
                         <Activity className="h-4 w-4 text-red-400" />
@@ -173,7 +173,7 @@ export const SecurityAnalytics = () => {
             {/* Filters */}
             <div className="flex gap-2">
                 <select
-                    className="p-2 border rounded-lg bg-slate-800 border-slate-700 text-slate-300 focus:ring-2 focus:ring-cyan-500 focus:border-transparent outline-none transition-all"
+                    className="p-2 border rounded-lg bg-zinc-900 border-zinc-800 text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent outline-none transition-all"
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value)}
                 >
@@ -185,27 +185,29 @@ export const SecurityAnalytics = () => {
             </div>
 
             {/* Table */}
-            <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden backdrop-blur-sm shadow-xl">
+            <div className="bg-zinc-900/50 rounded-xl border border-zinc-800 overflow-hidden backdrop-blur-sm shadow-xl">
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left text-slate-300">
-                        <thead className="bg-slate-900/50 text-slate-400 uppercase text-xs tracking-wider">
+                    <table className="w-full text-left text-zinc-300">
+                        <thead className="bg-zinc-950/50 text-zinc-400 uppercase text-xs tracking-wider">
                             <tr>
                                 <th className="p-4">Time</th>
                                 <th className="p-4">Email</th>
                                 <th className="p-4">IP Address</th>
+                                <th className="p-4">Input Details</th>
                                 <th className="p-4">Attempt Status</th>
                                 <th className="p-4">Review Status</th>
                                 <th className="p-4 text-right">Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-700/50">
+                        <tbody className="divide-y divide-zinc-800/50">
                             {filteredLogs.map(log => (
-                                <tr key={log.id} className="hover:bg-slate-700/30 transition-colors">
-                                    <td className="p-4 text-sm whitespace-nowrap text-slate-400">
+                                <tr key={log.id} className="hover:bg-zinc-800/30 transition-colors">
+                                    <td className="p-4 text-sm whitespace-nowrap text-zinc-400">
                                         {new Date(log.created_at).toLocaleString()}
                                     </td>
                                     <td className="p-4 font-medium text-white">{log.email}</td>
                                     <td className="p-4 font-mono text-sm text-cyan-400">{log.ip_address}</td>
+                                    <td className="p-4 text-sm text-slate-300 max-w-[200px] truncate" title={log.input_details}>{log.input_details || '-'}</td>
                                     <td className="p-4">
                                         <span className={`px-2 py-1 rounded-full text-xs font-medium border ${log.attempt_status === 'failure'
                                             ? 'bg-red-500/20 text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(248,113,113,0.2)]'
@@ -218,20 +220,20 @@ export const SecurityAnalytics = () => {
                                         <select
                                             className={`bg-transparent border rounded px-2 py-1 text-xs font-medium outline-none transition-all cursor-pointer ${log.review_status === 'unreviewed' ? 'border-amber-500/30 text-amber-400 bg-amber-500/5 hover:bg-amber-500/10' :
                                                 log.review_status === 'reviewed' ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/10' :
-                                                    'border-slate-500/30 text-slate-400 bg-slate-500/5 hover:bg-slate-500/10'
+                                                    'border-zinc-700 text-zinc-400 bg-zinc-800/50 hover:bg-zinc-800'
                                                 }`}
                                             value={log.review_status}
                                             onChange={(e) => handleStatusUpdate(log.id, e.target.value)}
                                         >
-                                            <option value="unreviewed" className="bg-slate-900 text-amber-400">Unreviewed</option>
-                                            <option value="reviewed" className="bg-slate-900 text-emerald-400">Reviewed</option>
-                                            <option value="false_positive" className="bg-slate-900 text-slate-400">False Positive</option>
+                                            <option value="unreviewed" className="bg-zinc-900 text-amber-400">Unreviewed</option>
+                                            <option value="reviewed" className="bg-zinc-900 text-emerald-400">Reviewed</option>
+                                            <option value="false_positive" className="bg-zinc-900 text-zinc-400">False Positive</option>
                                         </select>
                                     </td>
                                     <td className="p-4 text-right">
                                         <button
                                             onClick={() => handleDelete(log.id)}
-                                            className="p-2 hover:bg-red-500/20 text-slate-400 hover:text-red-400 rounded-lg transition-all"
+                                            className="p-2 hover:bg-red-500/10 text-zinc-500 hover:text-red-400 rounded-lg transition-all"
                                             title="Delete Log"
                                         >
                                             <Trash2 size={16} />
@@ -241,7 +243,7 @@ export const SecurityAnalytics = () => {
                             ))}
                             {filteredLogs.length === 0 && (
                                 <tr>
-                                    <td colSpan={6} className="p-8 text-center text-slate-500">
+                                    <td colSpan={7} className="p-8 text-center text-slate-500">
                                         No logs found matching filter.
                                     </td>
                                 </tr>
