@@ -27,10 +27,10 @@ def test_campaign_loop():
         print("❌ No mail config")
         return
     
-    # Get campaign
-    campaign = EmailCampaign.objects.filter(status='draft').first()
+    # Get campaign (any status)
+    campaign = EmailCampaign.objects.order_by('-created_at').first()
     if not campaign:
-        print("❌ No draft campaign found")
+        print("❌ No campaigns found in database")
         return
     
     print(f"\n✅ Testing Campaign: {campaign.name}")
