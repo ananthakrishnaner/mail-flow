@@ -67,11 +67,11 @@ export function RecentCampaigns() {
                 </Badge>
                 <div className="flex gap-2 ml-4">
                   <a
-                    href={`${API_URL}/stats/export?type=csv&campaign_id=${campaign.id}`}
+                    href={`${API_URL}/stats/export?type=docx&campaign_id=${campaign.id}`}
                     target="_blank"
                     rel="noreferrer"
                     className="p-2 hover:bg-zinc-800 rounded-lg transition-colors text-slate-400 hover:text-white"
-                    title="Download Report"
+                    title="Download Word Report"
                   >
                     <Download size={16} />
                   </a>
