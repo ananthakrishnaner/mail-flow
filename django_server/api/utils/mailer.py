@@ -517,7 +517,22 @@ def process_campaign_task(campaign_id, base_url):
             except Exception as e:
                 logger.error(f"Error processing recipient {recipient.email}: {e}")
                 
-        final_status = 'failed' if failed_count == len(recipients_list) and len(recipients_list) > 0 else 'sent'
+        # Determine final status
+        total_processed = sent_count + failed_count
+        
+        if total_processed == 0:
+            # No emails processed at all
+            final_status = 'failed'
+            logger.warning(f"Campaign completed but no emails were processed")
+        elif failed_count == total_processed:
+            # All emails failed
+            final_status = 'failed'
+            logger.warning(f"Campaign completed but all {failed_count} emails failed")
+        else:
+            # At least some emails sent successfully
+            final_status = 'sent'
+            logger.info(f"Campaign completed successfully: {sent_count} sent, {failed_count} failed")
+        
         campaign.status = final_status
         campaign.sent_at = timezone.now()
         campaign.save()
