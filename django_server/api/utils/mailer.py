@@ -457,9 +457,9 @@ def process_campaign_task(campaign_id, base_url):
                 # Create or Get Log
                 log, created = EmailLog.objects.get_or_create(
                     campaign=campaign,
+                    recipient=recipient,
                     recipient_email=recipient.email,
                     defaults={
-                        'recipient_name': recipient.name,
                         'status': 'pending'
                     }
                 )
