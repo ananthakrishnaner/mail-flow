@@ -151,7 +151,11 @@ export default function Campaigns() {
                                             <Button
                                                 size="sm"
                                                 className="gap-2"
-                                                onClick={() => startCampaign({ campaignId: campaign.id, delaySeconds: campaign.delay_seconds })}
+                                                onClick={() => startCampaign({
+                                                    campaignId: campaign.id,
+                                                    delaySeconds: campaign.delay_seconds,
+                                                    mode: 'start'
+                                                })}
                                             >
                                                 <Play className="w-4 h-4" />
                                                 Start
@@ -163,7 +167,11 @@ export default function Campaigns() {
                                                 size="sm"
                                                 variant="outline"
                                                 className="gap-2 border-yellow-500/20 text-yellow-500 hover:bg-yellow-500/10 hover:text-yellow-600"
-                                                onClick={() => updateCampaignStatus({ id: campaign.id, status: 'paused' })}
+                                                onClick={() => startCampaign({
+                                                    campaignId: campaign.id,
+                                                    delaySeconds: campaign.delay_seconds,
+                                                    mode: 'pause'
+                                                })}
                                             >
                                                 <Pause className="w-4 h-4" />
                                                 Pause
@@ -175,10 +183,11 @@ export default function Campaigns() {
                                                 size="sm"
                                                 variant="outline"
                                                 className="gap-2 border-green-500/20 text-green-500 hover:bg-green-500/10 hover:text-green-600"
-                                                onClick={() => {
-                                                    updateCampaignStatus({ id: campaign.id, status: 'sending' });
-                                                    startCampaign({ campaignId: campaign.id, delaySeconds: campaign.delay_seconds });
-                                                }}
+                                                onClick={() => startCampaign({
+                                                    campaignId: campaign.id,
+                                                    delaySeconds: campaign.delay_seconds,
+                                                    mode: 'start'
+                                                })}
                                             >
                                                 <Play className="w-4 h-4" />
                                                 Resume

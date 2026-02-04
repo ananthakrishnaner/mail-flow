@@ -323,20 +323,33 @@ def process_campaign_task(campaign_id, base_url):
         recipient_ids = campaign.recipient_ids
         
         logger.info(f"DEBUG: Campaign {campaign_id} raw recipient_ids (Type: {type(recipient_ids)}): {recipient_ids}")
+        logger.info(f"DEBUG: CHECKPOINT 1 - About to check if string")
         
-        # Ensure it's a list
-        if isinstance(recipient_ids, str):
-             try:
-                 import ast
-                 recipient_ids = ast.literal_eval(recipient_ids)
-                 logger.info(f"DEBUG: Parsed recipient_ids via ast: {recipient_ids}")
-             except Exception as e:
-                 logger.warning(f"DEBUG: ast.literal_eval failed: {e}")
-                 try:
-                    recipient_ids = json.loads(recipient_ids)
-                    logger.info(f"DEBUG: Parsed recipient_ids via json: {recipient_ids}")
-                 except Exception as json_e:
-                     logger.error(f"DEBUG: JSON parsing failed: {json_e}")
+        # WRAP EVERYTHING IN TRY-EXCEPT TO CATCH SILENT CRASHES
+        try:
+            # Ensure it's a list
+            if isinstance(recipient_ids, str):
+                logger.info(f"DEBUG: CHECKPOINT 2 - Is a string, parsing...")
+                try:
+                    import ast
+                    recipient_ids = ast.literal_eval(recipient_ids)
+                    logger.info(f"DEBUG: Parsed recipient_ids via ast: {recipient_ids}")
+                except Exception as e:
+                    logger.warning(f"DEBUG: ast.literal_eval failed: {e}")
+                    try:
+                        recipient_ids = json.loads(recipient_ids)
+                        logger.info(f"DEBUG: Parsed recipient_ids via json: {recipient_ids}")
+                    except Exception as json_e:
+                        logger.error(f"DEBUG: JSON parsing failed: {json_e}")
+            else:
+                logger.info(f"DEBUG: CHECKPOINT 3 - Already a list, skipping parse")
+        except Exception as crash:
+            logger.error(f"FATAL CRASH in isinstance/parsing block: {crash}")
+            import traceback
+            logger.error(f"Full traceback: {traceback.format_exc()}")
+            campaign.status = 'failed'
+            campaign.save()
+            return
         
         if not isinstance(recipient_ids, list):
             logger.error(f"CRITICAL: recipient_ids is not a list after parsing: {type(recipient_ids)}")
