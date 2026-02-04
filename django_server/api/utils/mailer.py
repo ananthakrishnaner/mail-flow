@@ -342,21 +342,30 @@ def process_campaign_task(campaign_id, base_url):
                      logger.error(f"DEBUG: JSON parsing failed: {json_e}")
         
         # Sanitize to UUID objects to avoid DB driver issues
+        logger.info(f"DEBUG: Starting UUID sanitization for {len(recipient_ids) if isinstance(recipient_ids, list) else 'unknown'} items")
         try:
             valid_uuids = []
-            for rid in recipient_ids:
+            for idx, rid in enumerate(recipient_ids):
+                logger.info(f"DEBUG: Processing UUID #{idx+1}: {rid} (Type: {type(rid)})")
                 if isinstance(rid, str):
                     try:
-                        valid_uuids.append(uuid.UUID(rid))
-                    except ValueError:
-                        logger.warning(f"Invalid UUID string found: {rid}")
+                        uuid_obj = uuid.UUID(rid)
+                        valid_uuids.append(uuid_obj)
+                        logger.info(f"DEBUG: Successfully converted to UUID: {uuid_obj}")
+                    except ValueError as ve:
+                        logger.warning(f"Invalid UUID string found: {rid} - Error: {ve}")
                 elif isinstance(rid, uuid.UUID):
                     valid_uuids.append(rid)
+                    logger.info(f"DEBUG: Already a UUID object: {rid}")
+                else:
+                    logger.warning(f"DEBUG: Skipping non-string/non-UUID item: {rid}")
             
             recipient_ids = valid_uuids
             logger.info(f"DEBUG: Final Validated UUIDs count: {len(recipient_ids)}")
         except Exception as e:
             logger.error(f"Error sanitizing UUIDs: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
 
         logger.info(f"DEBUG: Executing DB Query...")
         try:
@@ -399,6 +408,13 @@ def process_campaign_task(campaign_id, base_url):
         logger.info(f"DEBUG: Entering loop for {count} recipients.")
 
         for i, recipient in enumerate(recipients_list):
+            # Check if campaign was deleted - if so, abort immediately
+            try:
+                campaign.refresh_from_db()
+            except EmailCampaign.DoesNotExist:
+                logger.warning(f"Campaign {campaign_id} was deleted. Aborting send process.")
+                return
+            
             logger.info(f"DEBUG: Processing Recipient [{i+1}/{count}]: {recipient.email}")
             
             # Check if already processed (in case of restart)

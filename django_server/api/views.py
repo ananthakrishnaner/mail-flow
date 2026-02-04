@@ -177,11 +177,14 @@ class CampaignDetailView(APIView):
     def delete(self, request, pk):
         try:
             campaign = EmailCampaign.objects.get(pk=pk)
+            logger.info(f"API: Deleting campaign {pk} ({campaign.name}). Any running processes will abort.")
             campaign.delete()
+            logger.info(f"API: Campaign {pk} deleted successfully")
             return Response(status=status.HTTP_204_NO_CONTENT)
         except EmailCampaign.DoesNotExist:
             return Response({'error': 'Campaign not found'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
+            logger.error(f"API: Error deleting campaign {pk}: {e}")
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class CampaignStatusView(APIView):
