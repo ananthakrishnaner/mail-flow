@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
-import { Download } from 'lucide-react';
+import { FileSpreadsheet, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useCampaigns } from '@/hooks/useCampaigns';
 import { cn } from '@/lib/utils';
@@ -65,15 +65,24 @@ export function RecentCampaigns() {
                 <Badge className={cn('capitalize', statusStyles[campaign.status] || statusStyles.draft)}>
                   {campaign.status}
                 </Badge>
-                <div className="flex gap-2 ml-4">
+                <div className="flex gap-1 ml-4 shadow-sm rounded-lg overflow-hidden border border-zinc-800">
+                  <a
+                    href={`${API_URL}/stats/export?type=csv&campaign_id=${campaign.id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="p-2 bg-zinc-900 hover:bg-zinc-800 transition-colors text-slate-400 hover:text-green-500 border-r border-zinc-800"
+                    title="Download CSV"
+                  >
+                    <FileSpreadsheet size={16} />
+                  </a>
                   <a
                     href={`${API_URL}/stats/export?type=docx&campaign_id=${campaign.id}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="p-2 hover:bg-zinc-800 rounded-lg transition-colors text-slate-400 hover:text-white"
+                    className="p-2 bg-zinc-900 hover:bg-zinc-800 transition-colors text-slate-400 hover:text-blue-500"
                     title="Download Word Report"
                   >
-                    <Download size={16} />
+                    <FileText size={16} />
                   </a>
                 </div>
               </div>

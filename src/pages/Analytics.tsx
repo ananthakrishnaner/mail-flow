@@ -122,8 +122,9 @@ export default function Analytics() {
                 <span className="text-sm font-medium">Export Report</span>
               </button>
               <div className="absolute right-0 mt-2 w-48 bg-card border border-border rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                <a href={`${API_URL}/stats/export?type=csv`} target="_blank" rel="noreferrer" className="block px-4 py-2 hover:bg-muted text-sm">Download CSV</a>
-                <a href={`${API_URL}/stats/export?type=pdf`} target="_blank" rel="noreferrer" className="block px-4 py-2 hover:bg-muted text-sm">Download PDF</a>
+                <a href={`${API_URL}/stats/export?type=csv${selectedCampaignId !== 'all' ? `&campaign_id=${selectedCampaignId}` : ''}`} target="_blank" rel="noreferrer" className="block px-4 py-2 hover:bg-muted text-sm">Download CSV</a>
+                <a href={`${API_URL}/stats/export?type=pdf${selectedCampaignId !== 'all' ? `&campaign_id=${selectedCampaignId}` : ''}`} target="_blank" rel="noreferrer" className="block px-4 py-2 hover:bg-muted text-sm">Download PDF</a>
+                <a href={`${API_URL}/stats/export?type=docx${selectedCampaignId !== 'all' ? `&campaign_id=${selectedCampaignId}` : ''}`} target="_blank" rel="noreferrer" className="block px-4 py-2 hover:bg-muted text-sm font-medium border-t border-border mt-1 pt-2">Download Word Report</a>
               </div>
             </div>
           </div>

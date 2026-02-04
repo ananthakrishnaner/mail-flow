@@ -23,14 +23,37 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.styles import getSampleStyleSheet
 
 def strip_html_tags(html):
+    """Convert HTML to plain text for email deliverability"""
     if not html:
         return ""
-    # Simple regex to remove tags
-    clean = re.compile('<.*?>')
-    text = re.sub(clean, '', html)
-    # Decode entities
+    
     import html as html_parser
-    return html_parser.unescape(text).strip()
+    
+    # Replace common HTML elements with plain text equivalents
+    text = html
+    
+    # Convert line breaks
+    text = re.sub(r'<br\s*/?>', '\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'</p>', '\n\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'</div>', '\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'</h[1-6]>', '\n\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'</li>', '\n', text, flags=re.IGNORECASE)
+    
+    # Convert links to readable format: Link Text (URL)
+    text = re.sub(r'<a[^>]+href=["\']([^"\']+)["\'][^>]*>([^<]+)</a>', r'\2 (\1)', text, flags=re.IGNORECASE)
+    
+    # Remove all remaining HTML tags
+    clean = re.compile('<.*?>')
+    text = re.sub(clean, '', text)
+    
+    # Decode HTML entities
+    text = html_parser.unescape(text)
+    
+    # Clean up whitespace
+    text = re.sub(r'\n\s*\n\s*\n', '\n\n', text)  # Max 2 newlines
+    text = re.sub(r'[ \t]+', ' ', text)  # Normalize spaces
+    
+    return text.strip()
 
 def process_template_variables(html_content, recipient_email, recipient_name, log_id, tracking_enabled, base_url):
     processed = html_content or ''
@@ -58,13 +81,24 @@ def process_template_variables(html_content, recipient_email, recipient_name, lo
 
 def send_with_sendgrid(to_email, subject, html_content, from_email, from_name, api_key):
     try:
+        from sendgrid.helpers.mail import PlainTextContent
+        
+        plain_text = strip_html_tags(html_content)
+        
         # Use Official SDK as requested
         message = Mail(
             from_email=(from_email, from_name) if from_name else from_email,
             to_emails=to_email,
             subject=subject,
-            html_content=html_content
+            html_content=html_content,
+            plain_text_content=PlainTextContent(plain_text)
         )
+        
+        # Add basic anti-spam headers
+        # Note: unsubscribe URL should ideally be unique per recipient, using generic for now
+        message.add_header('Precedence', 'bulk')
+        message.add_header('X-Mailer', 'Mail Muse v1.0')
+        
         sg = SendGridAPIClient(api_key)
         response = sg.send(message)
         
@@ -88,13 +122,17 @@ def send_with_mailgun(to_email, subject, html_content, from_email, from_name, ap
         url = f"{base_url}/v3/{domain}/messages"
         auth = ('api', api_key)
         
+        plain_text = strip_html_tags(html_content)
         from_str = f"{from_name} <{from_email}>" if from_name else from_email
         
         data = {
             'from': from_str,
             'to': to_email,
             'subject': subject,
-            'html': html_content
+            'html': html_content,
+            'text': plain_text,
+            'h:Precedence': 'bulk',
+            'v:X-Mailer': 'Mail Muse v1.0'
         }
         
         response = requests.post(url, auth=auth, data=data)
@@ -112,7 +150,13 @@ def send_with_smtp(to_email, subject, html_content, from_email, from_name, host,
         msg['From'] = f"{from_name} <{from_email}>"
         msg['To'] = to_email
         
+        plain_text = strip_html_tags(html_content)
+        msg.attach(MIMEText(plain_text, 'plain'))
         msg.attach(MIMEText(html_content, 'html'))
+        
+        # Add headers
+        msg['Precedence'] = 'bulk'
+        msg['X-Mailer'] = 'Mail Muse v1.0'
         
         # Determine connection type
         if secure:
