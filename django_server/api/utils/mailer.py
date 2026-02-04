@@ -69,11 +69,15 @@ def send_with_sendgrid(to_email, subject, html_content, from_email, from_name, a
         response = sg.send(message)
         
         if 200 <= response.status_code < 300:
+            logger.info(f"DEBUG: SendGrid Success: {response.status_code}")
             return {'success': True}
         else:
-            return {'success': False, 'error': f"Status: {response.status_code}, Body: {response.body}"}
+            error_msg = f"Status: {response.status_code}, Body: {response.body}"
+            logger.error(f"DEBUG: SendGrid Failed: {error_msg}")
+            return {'success': False, 'error': error_msg}
     except Exception as e:
         error_msg = str(e)
+        logger.error(f"DEBUG: SendGrid Exception: {error_msg}")
         if "401" in error_msg:
             return {'success': False, 'error': "Invalid API Key (401 Unauthorized). Please check your SendGrid configuration."}
         return {'success': False, 'error': error_msg}
@@ -122,11 +126,14 @@ def send_with_smtp(to_email, subject, html_content, from_email, from_name, host,
 
         if user and password:
             server.login(user, password)
+            logger.info("DEBUG: SMTP Login Successful")
             
         server.sendmail(from_email, to_email, msg.as_string())
         server.quit()
+        logger.info(f"DEBUG: SMTP Send Successful to {to_email}")
         return {'success': True}
     except Exception as e:
+        logger.error(f"DEBUG: SMTP Error: {str(e)}")
         return {'success': False, 'error': str(e)}
 
 def send_twilio_sms(to_number, body, config):
@@ -145,6 +152,8 @@ def send_twilio_sms(to_number, body, config):
         return {'success': False, 'error': str(e)}
 
 def send_email(to_email, subject, html_content, config, recipient_phone=None):
+    logger.info(f"DEBUG: Attempting to send email to {to_email} via {config.provider}")
+    
     if config.provider == 'mailgun':
         return send_with_mailgun(
             to_email, subject, html_content,
@@ -152,6 +161,7 @@ def send_email(to_email, subject, html_content, config, recipient_phone=None):
             config.mailgun_api_key, config.mailgun_domain, config.mailgun_region
         )
     elif config.provider == 'smtp':
+        logger.info(f"DEBUG: Using SMTP Host: {config.smtp_host}:{config.smtp_port}, User: {config.smtp_user}")
         return send_with_smtp(
             to_email, subject, html_content,
             config.from_email, config.from_name,
@@ -162,6 +172,7 @@ def send_email(to_email, subject, html_content, config, recipient_phone=None):
     elif config.provider == 'twilio':
         # SMS Handler
         if not recipient_phone:
+             logger.warning(f"DEBUG: No phone number for {to_email}, skipping SMS.")
              return {'success': False, 'error': 'No phone number for recipient'}
         
         # Convert HTML to text for SMS
@@ -173,6 +184,7 @@ def send_email(to_email, subject, html_content, config, recipient_phone=None):
         return send_twilio_sms(recipient_phone, body, config)
     else:
         # Default SendGrid
+        logger.info(f"DEBUG: Using SendGrid for {to_email}")
         return send_with_sendgrid(
             to_email, subject, html_content,
             config.from_email, config.from_name,
@@ -460,6 +472,13 @@ def process_campaign_task(campaign_id, base_url):
 
     except Exception as e:
         logger.error(f"Campaign processing error: {e}")
+        try:
+            # Re-fetch strictly to avoid stale data race conditions
+            c = EmailCampaign.objects.get(id=campaign_id)
+            c.status = 'failed'
+            c.save()
+        except:
+            pass
     finally:
         connections.close_all()
 
