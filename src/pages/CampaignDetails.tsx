@@ -28,7 +28,8 @@ export default function CampaignDetails() {
         queryFn: async () => {
             const { data } = await api.get(`/campaigns/${id}`);
             return data;
-        }
+        },
+        refetchInterval: 1000 // Poll every second for live progress
     });
 
     const { data: serverLogs, isLoading: isLoadingLogs } = useQuery({
@@ -111,10 +112,18 @@ export default function CampaignDetails() {
                             <CardTitle className="text-sm font-medium text-muted-foreground">Completion</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold">
-                                {campaign.total_recipients > 0
-                                    ? Math.round(((campaign.sent_count + campaign.failed_count) / campaign.total_recipients) * 100)
-                                    : 0}%
+                            <div className="flex flex-col gap-2">
+                                <div className="text-2xl font-bold">
+                                    {campaign.total_recipients > 0
+                                        ? Math.round(((campaign.sent_count + campaign.failed_count) / campaign.total_recipients) * 100)
+                                        : 0}%
+                                </div>
+                                <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full bg-primary transition-all duration-500 ease-out"
+                                        style={{ width: `${campaign.total_recipients > 0 ? ((campaign.sent_count + campaign.failed_count) / campaign.total_recipients) * 100 : 0}%` }}
+                                    />
+                                </div>
                             </div>
                         </CardContent>
                     </Card>

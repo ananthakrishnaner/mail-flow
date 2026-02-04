@@ -153,6 +153,14 @@ class CampaignListView(APIView):
         return Response(serializer.errors, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class CampaignDetailView(APIView):
+    def get(self, request, pk):
+        try:
+            campaign = EmailCampaign.objects.get(pk=pk)
+            serializer = EmailCampaignSerializer(campaign)
+            return Response(serializer.data)
+        except EmailCampaign.DoesNotExist:
+            return Response({'error': 'Campaign not found'}, status=status.HTTP_404_NOT_FOUND)
+
     def delete(self, request, pk):
         try:
             campaign = EmailCampaign.objects.get(pk=pk)
@@ -200,26 +208,40 @@ class CampaignServerLogsView(APIView):
             
             # Helper to read logs
             def read_logs(path, source):
-                if not os.path.exists(path):
-                    return
-                
-                # Check file size, if too big, read last 1MB
-                file_size = os.path.getsize(path)
-                read_mode = 'r'
-                
-                with open(path, read_mode, encoding='utf-8', errors='ignore') as f:
-                    if file_size > 1024 * 1024: # 1MB
-                        f.seek(file_size - 1024 * 1024)
+                try:
+                    if not os.path.exists(path):
+                         # If file doesn't exist, just skip
+                        return
                     
-                    for line in f:
-                        if pk in line or "Campaign" in line: # Loose match for context
-                            # Cleaner filtering: Strict ID match or "Processing Campaign"
+                    # Check file permissions simply by trying to open
+                    # Check file size, if too big, read last 1MB
+                    file_size = os.path.getsize(path)
+                    read_mode = 'r'
+                    
+                    with open(path, read_mode, encoding='utf-8', errors='ignore') as f:
+                        if file_size > 512 * 1024: # Limit to last 512KB for speed
+                            f.seek(file_size - 512 * 1024)
+                        
+                        for line in f:
+                            # Filter for logs containing the campaign ID
                             if pk in line:
                                 logs.append({
                                     'source': source,
                                     'message': line.strip(),
                                     'timestamp': line.split(' - ')[0] if ' - ' in line else ''
                                 })
+                except PermissionError:
+                    logs.append({
+                        'source': source,
+                        'message': f"ERROR: Permission denied reading {os.path.basename(path)}. Please fix server permissions.",
+                        'timestamp': timezone.now().isoformat()
+                    })
+                except Exception as e:
+                    logs.append({
+                        'source': source,
+                        'message': f"ERROR: Failed to read log: {str(e)}",
+                        'timestamp': timezone.now().isoformat()
+                    })
 
             read_logs(log_path, 'mailer')
             read_logs(scheduler_log_path, 'scheduler')
