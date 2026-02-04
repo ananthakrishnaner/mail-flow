@@ -366,7 +366,7 @@ def process_campaign_task(campaign_id, base_url):
 
                 # Personalize
                 personalized_html = process_template_variables(
-                    campaign.html_content,
+                    base_html_content, # Use base_html_content
                     recipient.email,
                     recipient.name,
                     log_id,
