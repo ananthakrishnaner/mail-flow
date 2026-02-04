@@ -32,13 +32,12 @@ export default function CampaignDetails() {
         refetchInterval: 1000 // Poll every second for live progress
     });
 
-    const { data: serverLogs, isLoading: isLoadingLogs } = useQuery({
+    const { data: serverLogs, isLoading: isLoadingLogs, refetch: refetchLogs, isRefetching: isRefetchingLogs } = useQuery({
         queryKey: ['campaign-logs', id],
         queryFn: async () => {
             const { data } = await api.get(`/campaigns/${id}/server-logs`);
             return data as ServerLog[];
-        },
-        refetchInterval: 2000 // Poll logs while viewing
+        }
     });
 
     if (isLoadingCampaign) {
