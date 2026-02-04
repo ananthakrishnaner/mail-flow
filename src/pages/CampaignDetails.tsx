@@ -137,16 +137,28 @@ export default function CampaignDetails() {
 
                     <TabsContent value="server-logs">
                         <Card className="bg-black/95 text-green-400 border-zinc-800">
-                            <CardHeader>
+                            <CardHeader className="flex flex-row items-center justify-between">
                                 <CardTitle className="flex items-center gap-2 text-white">
                                     <Terminal className="w-5 h-5" />
                                     Internal Server Logs
                                 </CardTitle>
-                                <CardDescription className="text-zinc-500">
-                                    Real-time logs from the mailer daemon and scheduler related to this campaign.
-                                </CardDescription>
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => refetchLogs()}
+                                        disabled={isRefetchingLogs}
+                                        className="h-8 border-zinc-700 bg-black hover:bg-zinc-800 text-zinc-300"
+                                    >
+                                        {isRefetchingLogs ? <Loader2 className="w-3 h-3 animate-spin mr-2" /> : <Clock className="w-3 h-3 mr-2" />}
+                                        {isRefetchingLogs ? 'Refreshing...' : 'Pull Latest Logs'}
+                                    </Button>
+                                </div>
                             </CardHeader>
                             <CardContent>
+                                <CardDescription className="text-zinc-500 mb-4">
+                                    Real-time logs from the mailer daemon and scheduler related to this campaign. Use the button above to fetch new logs.
+                                </CardDescription>
                                 <ScrollArea className="h-[400px] w-full rounded-md border border-zinc-800 bg-black p-4 font-mono text-xs">
                                     {isLoadingLogs ? (
                                         <div className="flex items-center gap-2 text-zinc-500">

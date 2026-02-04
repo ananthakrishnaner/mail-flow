@@ -332,9 +332,9 @@ def process_campaign_task(campaign_id, base_url):
              except:
                  pass
         
-        recipients_list = EmailRecipient.objects.filter(id__in=recipient_ids)
+        recipients_list = list(EmailRecipient.objects.filter(id__in=recipient_ids))
         
-        count = recipients_list.count()
+        count = len(recipients_list)
         logger.info(f"DEBUG: Database found {count} recipients for IDs: {recipient_ids}")
         
         if count == 0 and len(recipient_ids) > 0:
@@ -364,11 +364,15 @@ def process_campaign_task(campaign_id, base_url):
         sent_count = campaign.sent_count
         failed_count = campaign.failed_count
         
-        logger.info(f"Targeting {count} recipients.")
+        logger.info(f"DEBUG: Entering loop for {count} recipients.")
 
         for i, recipient in enumerate(recipients_list):
+            logger.info(f"DEBUG: Processing Recipient [{i+1}/{count}]: {recipient.email}")
+            
             # Check if already processed (in case of restart)
-            if EmailLog.objects.filter(campaign=campaign, recipient_email=recipient.email).exclude(status='pending').exists():
+            is_processed = EmailLog.objects.filter(campaign=campaign, recipient_email=recipient.email).exclude(status='pending').exists()
+            if is_processed:
+                logger.info(f"DEBUG: Skipping {recipient.email} - Already processed")
                 continue
 
             try:
