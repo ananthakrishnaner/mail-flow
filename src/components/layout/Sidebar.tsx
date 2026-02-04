@@ -9,6 +9,7 @@ import {
   Settings,
   Send,
   BarChart3,
+  LogOut,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEmailStats } from '@/hooks/useEmailStats';
@@ -75,7 +76,18 @@ export function Sidebar() {
         </ul>
       </nav>
 
-      <div className="p-4 border-t border-sidebar-border">
+      <div className="p-4 border-t border-sidebar-border space-y-4">
+        <button
+          onClick={() => {
+            localStorage.removeItem('access_token');
+            window.location.href = '/login';
+          }}
+          className="flex items-center gap-3 px-4 py-3 w-full rounded-lg text-sm font-medium transition-all duration-200 text-destructive hover:bg-destructive/10"
+        >
+          <LogOut className="w-5 h-5" />
+          Logout
+        </button>
+
         <div className="bg-sidebar-accent rounded-lg p-4">
           <p className="text-xs text-sidebar-foreground/60 mb-2">Quick Stats</p>
           <p className="text-2xl font-bold text-sidebar-foreground">{stats.totalSent.toLocaleString()}</p>
