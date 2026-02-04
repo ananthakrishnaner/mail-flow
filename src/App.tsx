@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import Campaigns from "./pages/Campaigns";
+import CampaignDetails from "./pages/CampaignDetails";
 import Recipients from "./pages/Recipients";
 import Compose from "./pages/Compose";
 import Templates from "./pages/Templates";
@@ -34,6 +35,7 @@ const App = () => (
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<Index />} />
             <Route path="/campaigns" element={<Campaigns />} />
+            <Route path="/campaigns/:id" element={<CampaignDetails />} />
             <Route path="/recipients" element={<Recipients />} />
             <Route path="/compose" element={<Compose />} />
             <Route path="/templates" element={<Templates />} />

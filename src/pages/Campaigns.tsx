@@ -24,9 +24,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from '@/components/ui/badge';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 
 export default function Campaigns() {
+    const navigate = useNavigate();
     const { campaigns, isLoading, updateCampaignStatus, deleteCampaign, startCampaign } = useCampaigns();
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -108,7 +110,8 @@ export default function Campaigns() {
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: index * 0.05 }}
-                                className="bg-card border border-border rounded-xl p-5 hover:border-primary/50 transition-colors group"
+                                onClick={() => navigate(`/campaigns/${campaign.id}`)}
+                                className="bg-card border border-border rounded-xl p-5 hover:border-primary/50 transition-colors group cursor-pointer"
                             >
                                 <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
                                     <div className="flex-1 min-w-0">

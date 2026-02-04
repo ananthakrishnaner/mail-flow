@@ -190,6 +190,48 @@ class CampaignLogsView(APIView):
         serializer = EmailLogSerializer(logs, many=True)
         return Response(serializer.data)
 
+class CampaignServerLogsView(APIView):
+    def get(self, request, pk):
+        try:
+            log_path = os.path.join(settings.BASE_DIR, 'mailer.log')
+            scheduler_log_path = os.path.join(settings.BASE_DIR, 'scheduler.log')
+            
+            logs = []
+            
+            # Helper to read logs
+            def read_logs(path, source):
+                if not os.path.exists(path):
+                    return
+                
+                # Check file size, if too big, read last 1MB
+                file_size = os.path.getsize(path)
+                read_mode = 'r'
+                
+                with open(path, read_mode, encoding='utf-8', errors='ignore') as f:
+                    if file_size > 1024 * 1024: # 1MB
+                        f.seek(file_size - 1024 * 1024)
+                    
+                    for line in f:
+                        if pk in line or "Campaign" in line: # Loose match for context
+                            # Cleaner filtering: Strict ID match or "Processing Campaign"
+                            if pk in line:
+                                logs.append({
+                                    'source': source,
+                                    'message': line.strip(),
+                                    'timestamp': line.split(' - ')[0] if ' - ' in line else ''
+                                })
+
+            read_logs(log_path, 'mailer')
+            read_logs(scheduler_log_path, 'scheduler')
+            
+            # Sort by timestamp (approximate) or just return as is (lines are chronological per file)
+            # Merging two files chronologically is hard without parsing dates strictly.
+            # Let's just return them.
+            
+            return Response(logs)
+        except Exception as e:
+            return Response({'error': str(e)}, status=500)
+
 # --- Stats ---
 class StatsSummaryView(APIView):
     def get(self, request):
