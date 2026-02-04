@@ -307,38 +307,52 @@ def process_campaign_task(campaign_id, base_url):
             campaign.save()
             return
 
-        # Get recipients
-        recipients = EmailLog.objects.filter(campaign=campaign, status='pending')
-        # If no pending logs, maybe it's a fresh start? 
-        # The logic seems to rely on logs being pre-created or created here?
-        # Checking previous implementation... it iterates recipients_ids if no logs?
-        # The original code iterated `campaign.recipient_ids`.
-        
-        # Let's stick to original logic but add logging
+        # Get recipients - Refactored for debugging
         recipient_ids = campaign.recipient_ids
+        
+        # DEBUG LOGGING
+        logger.info(f"DEBUG: Campaign {campaign_id} raw recipient_ids: {recipient_ids}")
+        
+        # Ensure it's a list
+        if isinstance(recipient_ids, str):
+             try:
+                 recipient_ids = json.loads(recipient_ids)
+             except:
+                 pass
+        
+        recipients_list = EmailRecipient.objects.filter(id__in=recipient_ids)
+        
+        count = recipients_list.count()
+        logger.info(f"DEBUG: Database found {count} recipients for IDs: {recipient_ids}")
+        
+        if count == 0 and len(recipient_ids) > 0:
+            logger.error("CRITICAL: Recipient IDs provided but no objects found in DB!")
+            # verification check
+            all_count = EmailRecipient.objects.count()
+            logger.info(f"DEBUG: Total EmailRecipients in DB: {all_count}")
+
+        campaign.total_recipients = count
+        campaign.save()
+
+        # Define base_html_content (fix for previous NameError)
+        base_html_content = campaign.html_content
+        if not base_html_content and campaign.template:
+            base_html_content = campaign.template.html_content or ''
+
         processed_count = 0
         
         # We need to know if we are resuming or starting.
         # If logs exist, we might be resuming.
         existing_logs = EmailLog.objects.filter(campaign=campaign)
         
-        final_recipients = []
-        
         if existing_logs.exists():
-             # Resume: only pending
-             pending_logs = existing_logs.filter(status='pending')
-             # We need to map back to recipient objects or just use logs
-             # The original code looped through EmailRecipient objects based on ids.
-             # This is a bit tricky if we want to support resume.
-             # precise resumption requires checking if a log exists for that recipient.
+             # Resume logic: exclude already processed
              pass
-        
-        recipients_list = EmailRecipient.objects.filter(id__in=recipient_ids)
         
         sent_count = campaign.sent_count
         failed_count = campaign.failed_count
         
-        logger.info(f"Targeting {len(recipients_list)} recipients.")
+        logger.info(f"Targeting {count} recipients.")
 
         for i, recipient in enumerate(recipients_list):
             # Check if already processed (in case of restart)
