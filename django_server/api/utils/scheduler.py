@@ -26,6 +26,7 @@ def run_scheduler():
     while True:
         try:
             now = timezone.now()
+            logger.info(f"Scheduler Heartbeat: Checking for campaigns at {now}")
             # Find campaigns
             campaigns = EmailCampaign.objects.filter(status='scheduled', scheduled_at__lte=now)
             
@@ -34,7 +35,7 @@ def run_scheduler():
             
             for campaign in campaigns:
                 logger.info(f"Executing campaign {campaign.id} - {campaign.name}")
-                base_url = "http://localhost:8000" 
+                base_url = settings.SITE_URL
                 process_campaign(campaign.id, base_url)
                 
             # Sleep 
@@ -59,7 +60,7 @@ def start_scheduler():
         
     except IOError:
         # Lock is held by another process
-        # logger.warning("Scheduler lock held by another process. Skipping.")
+        logger.warning("Scheduler lock held by another process. Skipping start.")
         pass
     except Exception as e:
         logger.error(f"Failed to start scheduler: {e}")

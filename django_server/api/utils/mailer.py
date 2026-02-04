@@ -341,11 +341,32 @@ def process_campaign_task(campaign_id, base_url):
                  except Exception as json_e:
                      logger.error(f"DEBUG: JSON parsing failed: {json_e}")
         
-        logger.info(f"DEBUG: Final recipient_ids for query (Type: {type(recipient_ids)}): {recipient_ids}")
+        # Sanitize to UUID objects to avoid DB driver issues
+        try:
+            valid_uuids = []
+            for rid in recipient_ids:
+                if isinstance(rid, str):
+                    try:
+                        valid_uuids.append(uuid.UUID(rid))
+                    except ValueError:
+                        logger.warning(f"Invalid UUID string found: {rid}")
+                elif isinstance(rid, uuid.UUID):
+                    valid_uuids.append(rid)
+            
+            recipient_ids = valid_uuids
+            logger.info(f"DEBUG: Final Validated UUIDs count: {len(recipient_ids)}")
+        except Exception as e:
+            logger.error(f"Error sanitizing UUIDs: {e}")
 
-        recipients_list = list(EmailRecipient.objects.filter(id__in=recipient_ids))
-        
-        count = len(recipients_list)
+        logger.info(f"DEBUG: Executing DB Query...")
+        try:
+            recipients_list = list(EmailRecipient.objects.filter(id__in=recipient_ids))
+            count = len(recipients_list)
+        except Exception as e:
+            logger.error(f"CRITICAL DB CRASH during recipient fetch: {e}")
+            recipients_list = []
+            count = 0
+            
         logger.info(f"DEBUG: Database found {count} recipients for IDs: {recipient_ids}")
         
         if count == 0 and len(recipient_ids) > 0:

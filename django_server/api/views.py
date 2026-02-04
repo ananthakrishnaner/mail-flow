@@ -19,6 +19,17 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
+import logging
+
+# Configure Logger for API views to write to mailer.log
+logger = logging.getLogger('api_views')
+if not logger.handlers:
+    log_path = os.path.join(settings.BASE_DIR, 'mailer.log')
+    handler = logging.FileHandler(log_path)
+    formatter = logging.Formatter('%(asctime)s - [API] - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
 
 # --- Config ---
 class ConfigView(APIView):
@@ -188,10 +199,16 @@ class CampaignStatusView(APIView):
 
 class CampaignStartView(APIView):
     def post(self, request, pk):
-        base_url = f"{request.scheme}://{request.get_host()}"
-        # Start in background, but only after transaction commits to ensure thread sees data
-        transaction.on_commit(lambda: process_campaign(pk, base_url))
-        return Response({'success': True, 'message': 'Campaign started'})
+        try:
+            logger.info(f"API: Received start request for campaign {pk}")
+            base_url = f"{request.scheme}://{request.get_host()}"
+            # Start in background, but only after transaction commits to ensure thread sees data
+            transaction.on_commit(lambda: process_campaign(pk, base_url))
+            logger.info(f"API: Campaign {pk} queued for background processing")
+            return Response({'success': True, 'message': 'Campaign started'})
+        except Exception as e:
+            logger.error(f"API: Failed to start campaign {pk}: {e}")
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # --- Logs ---
 class CampaignLogsView(APIView):

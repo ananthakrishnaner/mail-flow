@@ -23,6 +23,8 @@ DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '*').split(',')
 
+SITE_URL = os.getenv('SITE_URL', 'http://localhost:8000')
+
 # Application definition
 
 INSTALLED_APPS = [
