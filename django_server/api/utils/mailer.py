@@ -7,6 +7,9 @@ import time
 import json
 import threading
 import re
+import logging
+import os
+from django.conf import settings
 from django.utils import timezone
 from api.models import MailConfig, EmailRecipient, EmailTemplate, EmailCampaign, EmailLog
 import uuid
@@ -357,22 +360,148 @@ def process_campaign_task(campaign_id, base_url):
                 else:
                     failed_count += 1
                 
+# Configure Logger
+logger = logging.getLogger('mailer')
+if not logger.handlers:
+    log_path = os.path.join(settings.BASE_DIR, 'mailer.log')
+    handler = logging.FileHandler(log_path)
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+
+def process_campaign_task(campaign_id, base_url):
+    # This runs in a thread
+    logger.info(f"Starting campaign processing task for ID: {campaign_id}")
+    try:
+        from django.db import connections
+        # Ensure we have a fresh connection for this thread
+        connections.close_all()
+        
+        campaign = EmailCampaign.objects.get(id=campaign_id)
+        
+        if campaign.status != 'scheduled' and campaign.status != 'draft' and campaign.status != 'paused':
+             logger.warning(f"Campaign {campaign.name} is {campaign.status}, skipping start.")
+             return
+
+        logger.info(f"Processing Campaign: {campaign.name}")
+        campaign.status = 'sending'
+        campaign.save()
+        
+        config = MailConfig.objects.first()
+        if not config or not config.is_configured:
+            logger.error("Mail config missing or invalid")
+            campaign.status = 'failed'
+            campaign.save()
+            return
+
+        # Get recipients
+        recipients = EmailLog.objects.filter(campaign=campaign, status='pending')
+        # If no pending logs, maybe it's a fresh start? 
+        # The logic seems to rely on logs being pre-created or created here?
+        # Checking previous implementation... it iterates recipients_ids if no logs?
+        # The original code iterated `campaign.recipient_ids`.
+        
+        # Let's stick to original logic but add logging
+        recipient_ids = campaign.recipient_ids
+        processed_count = 0
+        
+        # We need to know if we are resuming or starting.
+        # If logs exist, we might be resuming.
+        existing_logs = EmailLog.objects.filter(campaign=campaign)
+        
+        final_recipients = []
+        
+        if existing_logs.exists():
+             # Resume: only pending
+             pending_logs = existing_logs.filter(status='pending')
+             # We need to map back to recipient objects or just use logs
+             # The original code looped through EmailRecipient objects based on ids.
+             # This is a bit tricky if we want to support resume.
+             # precise resumption requires checking if a log exists for that recipient.
+             pass
+        
+        recipients_list = EmailRecipient.objects.filter(id__in=recipient_ids)
+        
+        sent_count = campaign.sent_count
+        failed_count = campaign.failed_count
+        
+        logger.info(f"Targeting {len(recipients_list)} recipients.")
+
+        for i, recipient in enumerate(recipients_list):
+            # Check if already processed (in case of restart)
+            if EmailLog.objects.filter(campaign=campaign, recipient_email=recipient.email).exclude(status='pending').exists():
+                continue
+
+            try:
+                # Create or Get Log
+                log, created = EmailLog.objects.get_or_create(
+                    campaign=campaign,
+                    recipient_email=recipient.email,
+                    defaults={
+                        'recipient_name': recipient.name,
+                        'status': 'pending'
+                    }
+                )
+                
+                log_id = str(log.id)
+                
+                # Check Pause
+                campaign.refresh_from_db()
+                if campaign.status == 'paused':
+                    logger.info("Campaign paused by user.")
+                    return
+
+                # Personalize
+                personalized_html = process_template_variables(
+                    campaign.html_content,
+                    recipient.email,
+                    recipient.name,
+                    log_id,
+                    config.tracking_enabled,
+                    base_url
+                )
+                
+                result = send_email(
+                    recipient.email,
+                    campaign.subject,
+                    personalized_html,
+                    config,
+                    recipient_phone=recipient.phone
+                )
+                
+                # Update Log and Recipient
+                log.status = 'sent' if result['success'] else 'failed'
+                log.error_message = json.dumps(result.get('error')) if not result['success'] else None
+                log.sent_at = timezone.now()
+                log.save()
+                
+                recipient.status = 'sent' if result['success'] else 'failed'
+                recipient.save()
+                
+                if result['success']:
+                    sent_count += 1
+                else:
+                    failed_count += 1
+                    logger.warning(f"Failed to send to {recipient.email}: {result.get('error')}")
+                
                 # Update live stats
                 campaign.sent_count = sent_count
                 campaign.failed_count = failed_count
                 campaign.save()
                 
                 # Delay
-                if i < len(recipients) - 1 and campaign.delay_seconds > 0:
+                if i < len(recipients_list) - 1 and campaign.delay_seconds > 0:
                     time.sleep(campaign.delay_seconds)
                     
             except Exception as e:
-                print(f"Error processing recipient {recipient.email}: {e}")
+                logger.error(f"Error processing recipient {recipient.email}: {e}")
                 
-        final_status = 'failed' if failed_count == len(recipients) and len(recipients) > 0 else 'sent'
+        final_status = 'failed' if failed_count == len(recipients_list) and len(recipients_list) > 0 else 'sent'
         campaign.status = final_status
         campaign.sent_at = timezone.now()
         campaign.save()
+        logger.info(f"Campaign finished. Status: {final_status}. Sent: {sent_count}, Failed: {failed_count}")
         
         # Telegram Notification
         if config.telegram_notifications_enabled and config.telegram_bot_token and config.telegram_chat_id:
@@ -399,12 +528,14 @@ def process_campaign_task(campaign_id, base_url):
                     data=data,
                     files=files
                 )
-                print("Telegram report sent")
+                logger.info("Telegram report sent")
             except Exception as e:
-                print(f"Failed to send Telegram report: {e}")
+                logger.error(f"Failed to send Telegram report: {e}")
 
     except Exception as e:
-        print(f"Campaign processing error: {e}")
+        logger.error(f"Campaign processing error: {e}")
+    finally:
+        connections.close_all()
 
 def process_campaign(campaign_id, base_url):
     t = threading.Thread(target=process_campaign_task, args=(campaign_id, base_url))
