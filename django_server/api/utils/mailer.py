@@ -81,7 +81,7 @@ def process_template_variables(html_content, recipient_email, recipient_name, lo
 
 def send_with_sendgrid(to_email, subject, html_content, from_email, from_name, api_key):
     try:
-        from sendgrid.helpers.mail import PlainTextContent
+        from sendgrid.helpers.mail import PlainTextContent, Header
         
         plain_text = strip_html_tags(html_content)
         
@@ -95,9 +95,8 @@ def send_with_sendgrid(to_email, subject, html_content, from_email, from_name, a
         )
         
         # Add basic anti-spam headers
-        # Note: unsubscribe URL should ideally be unique per recipient, using generic for now
-        message.add_header('Precedence', 'bulk')
-        message.add_header('X-Mailer', 'Mail Muse v1.0')
+        message.add_header(Header('Precedence', 'bulk'))
+        message.add_header(Header('X-Mailer', 'Mail Muse v1.0'))
         
         sg = SendGridAPIClient(api_key)
         response = sg.send(message)
@@ -132,7 +131,7 @@ def send_with_mailgun(to_email, subject, html_content, from_email, from_name, ap
             'html': html_content,
             'text': plain_text,
             'h:Precedence': 'bulk',
-            'v:X-Mailer': 'Mail Muse v1.0'
+            'h:X-Mailer': 'Mail Muse v1.0'
         }
         
         response = requests.post(url, auth=auth, data=data)
