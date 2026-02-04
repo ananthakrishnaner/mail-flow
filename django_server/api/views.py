@@ -204,11 +204,43 @@ class CampaignStartView(APIView):
     def post(self, request, pk):
         try:
             logger.info(f"API: Received start request for campaign {pk}")
-            base_url = f"{request.scheme}://{request.get_host()}"
-            # Start in background, but only after transaction commits to ensure thread sees data
-            transaction.on_commit(lambda: process_campaign(pk, base_url))
-            logger.info(f"API: Campaign {pk} queued for background processing")
-            return Response({'success': True, 'message': 'Campaign started'})
+            
+            # Get the campaign
+            campaign = EmailCampaign.objects.get(pk=pk)
+            
+            # Get mode from request (default to 'start' for immediate sending)
+            mode = request.data.get('mode', 'start')
+            
+            if mode not in ['draft', 'start', 'pause']:
+                return Response({'error': 'Invalid mode. Must be draft, start, or pause'}, 
+                              status=status.HTTP_400_BAD_REQUEST)
+            
+            logger.info(f"API: Campaign {pk} mode: {mode}")
+            
+            if mode == 'draft':
+                # Just save as draft, don't start sending
+                campaign.status = 'draft'
+                campaign.save()
+                logger.info(f"API: Campaign {pk} saved as draft")
+                return Response({'success': True, 'message': 'Campaign saved as draft', 'status': 'draft'})
+            
+            elif mode == 'pause':
+                # Set to paused state
+                campaign.status = 'paused'
+                campaign.save()
+                logger.info(f"API: Campaign {pk} paused")
+                return Response({'success': True, 'message': 'Campaign paused', 'status': 'paused'})
+            
+            else:  # mode == 'start'
+                # Start sending immediately
+                base_url = f"{request.scheme}://{request.get_host()}"
+                # Start in background, but only after transaction commits to ensure thread sees data
+                transaction.on_commit(lambda: process_campaign(pk, base_url))
+                logger.info(f"API: Campaign {pk} queued for background processing")
+                return Response({'success': True, 'message': 'Campaign started', 'status': 'sending'})
+                
+        except EmailCampaign.DoesNotExist:
+            return Response({'error': 'Campaign not found'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             logger.error(f"API: Failed to start campaign {pk}: {e}")
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

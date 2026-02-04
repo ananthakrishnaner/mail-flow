@@ -17,9 +17,14 @@ from api.utils.mailer import send_email
 import time
 
 def test_campaign_loop():
+    import sys
+    
     print("=" * 60)
     print("MINIMAL CAMPAIGN SEND TEST")
     print("=" * 60)
+    
+    # Check for mode argument
+    mode = sys.argv[1] if len(sys.argv) > 1 else 'any'
     
     # Get config
     config = MailConfig.objects.first()
@@ -27,14 +32,27 @@ def test_campaign_loop():
         print("❌ No mail config")
         return
     
-    # Get campaign (any status)
-    campaign = EmailCampaign.objects.order_by('-created_at').first()
-    if not campaign:
-        print("❌ No campaigns found in database")
-        return
+    # Get campaign based on mode
+    if mode == 'draft':
+        campaign = EmailCampaign.objects.filter(status='draft').order_by('-created_at').first()
+        if not campaign:
+            print("❌ No draft campaigns found")
+            return
+    elif mode == 'paused':
+        campaign = EmailCampaign.objects.filter(status='paused').order_by('-created_at').first()
+        if not campaign:
+            print("❌ No paused campaigns found")
+            return
+    else:
+        # Get any campaign
+        campaign = EmailCampaign.objects.order_by('-created_at').first()
+        if not campaign:
+            print("❌ No campaigns found in database")
+            return
     
     print(f"\n✅ Testing Campaign: {campaign.name}")
     print(f"   Campaign ID: {campaign.id}")
+    print(f"   Status: {campaign.status}")
     print(f"   Recipient IDs: {campaign.recipient_ids}")
     print(f"   Type: {type(campaign.recipient_ids)}")
     
