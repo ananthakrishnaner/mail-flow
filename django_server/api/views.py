@@ -14,7 +14,7 @@ from .models import MailConfig, EmailRecipient, EmailTemplate, EmailCampaign, Em
 from .serializers import MailConfigSerializer, EmailRecipientSerializer, EmailTemplateSerializer, EmailCampaignSerializer, EmailLogSerializer
 from .utils.mailer import process_campaign, send_email, process_template_variables
 import uuid
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseRedirect
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
@@ -465,22 +465,49 @@ class TrackEmailView(APIView):
     def get(self, request):
         log_id = request.GET.get('id')
         type_ = request.GET.get('type')
+        url = request.GET.get('url')  # For click tracking
         
         if log_id:
             try:
                 log = EmailLog.objects.get(id=log_id)
                 campaign = log.campaign
                 
+                # Capture user agent and IP
+                user_agent = request.META.get('HTTP_USER_AGENT', '')
+                ip_address = request.META.get('HTTP_X_FORWARDED_FOR', request.META.get('REMOTE_ADDR', ''))
+                if ',' in ip_address:
+                    ip_address = ip_address.split(',')[0].strip()
+                
                 if type_ == 'open' and not log.opened_at:
                     log.opened_at = timezone.now()
+                    log.user_agent = user_agent[:500]  # Limit to field size
+                    log.ip_address = ip_address
                     log.save()
                     # Atomic increment
                     EmailCampaign.objects.filter(pk=campaign.pk).update(open_count=F('open_count') + 1)
+                    logger.info(f"Email opened: {log.recipient_email} (Campaign: {campaign.name})")
+                
+                elif type_ == 'click' and not log.clicked_at:
+                    log.clicked_at = timezone.now()
+                    if not log.user_agent:  # Only set if not already set by open
+                        log.user_agent = user_agent[:500]
+                        log.ip_address = ip_address
+                    log.save()
+                    # Atomic increment
+                    EmailCampaign.objects.filter(pk=campaign.pk).update(click_count=F('click_count') + 1)
+                    logger.info(f"Email clicked: {log.recipient_email} (Campaign: {campaign.name})")
                     
+                    # Redirect to actual URL if provided
+                    if url:
+                        return HttpResponseRedirect(url)
+                    
+            except EmailLog.DoesNotExist:
+                logger.warning(f"Tracking attempt for non-existent log: {log_id}")
             except Exception as e:
-                print(f"Tracking error: {e}")
+                logger.error(f"Tracking error: {e}")
                 pass
 
+        # Return 1x1 transparent GIF for open tracking
         pixel = base64.b64decode('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7')
         return HttpResponse(pixel, content_type='image/gif')
 

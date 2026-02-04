@@ -132,7 +132,7 @@ export default function Analytics() {
         <Tabs defaultValue="campaigns" className="space-y-4">
           <TabsList>
             <TabsTrigger value="campaigns">Campaign Analytics</TabsTrigger>
-            <TabsTrigger value="security">Security Logs</TabsTrigger>
+            <TabsTrigger value="security">Analysis of Data</TabsTrigger>
           </TabsList>
 
           <TabsContent value="campaigns" className="space-y-6">

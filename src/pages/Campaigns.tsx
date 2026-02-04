@@ -39,6 +39,8 @@ export default function Campaigns() {
 
     const getStatusBadge = (status: string) => {
         switch (status) {
+            case 'draft':
+                return <Badge variant="outline" className="text-muted-foreground border-muted">Draft</Badge>;
             case 'sending':
                 return <Badge className="bg-blue-500 hover:bg-blue-600 animate-pulse">Sending</Badge>;
             case 'paused':
@@ -127,10 +129,17 @@ export default function Campaigns() {
                                                 <Users className="w-3.5 h-3.5" />
                                                 {campaign.total_recipients} recipients
                                             </span>
-                                            <span className="flex items-center gap-1.5">
-                                                <Clock className="w-3.5 h-3.5" />
-                                                Created {new Date(campaign.created_at).toLocaleDateString()}
-                                            </span>
+                                            {campaign.status === 'scheduled' && campaign.scheduled_at ? (
+                                                <span className="flex items-center gap-1.5 text-primary font-medium">
+                                                    <Clock className="w-3.5 h-3.5" />
+                                                    Scheduled: {new Date(campaign.scheduled_at).toLocaleString()}
+                                                </span>
+                                            ) : (
+                                                <span className="flex items-center gap-1.5">
+                                                    <Clock className="w-3.5 h-3.5" />
+                                                    Created {new Date(campaign.created_at).toLocaleDateString()}
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
 

@@ -508,6 +508,19 @@ def process_campaign_task(campaign_id, base_url):
                 # Update live stats
                 campaign.sent_count = sent_count
                 campaign.failed_count = failed_count
+                
+                # If this is the last recipient, update status immediately
+                if i == len(recipients_list) - 1:
+                    total_processed = sent_count + failed_count
+                    if total_processed == 0:
+                        campaign.status = 'failed'
+                    elif failed_count == total_processed:
+                        campaign.status = 'failed'
+                    else:
+                        campaign.status = 'sent'
+                    campaign.sent_at = timezone.now()
+                    logger.info(f"Last recipient processed. Updating status to: {campaign.status}")
+                
                 campaign.save()
                 
                 # Delay
