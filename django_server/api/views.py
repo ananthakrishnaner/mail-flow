@@ -851,6 +851,165 @@ class StatsExportView(APIView):
             
             doc.build(elements)
             return response
+        
+        elif export_type == 'docx':
+            # Word document export
+            from docx import Document
+            from docx.shared import Inches, Pt, RGBColor
+            from docx.enum.text import WD_ALIGN_PARAGRAPH
+            from datetime import datetime
+            
+            doc = Document()
+            
+            # Set document margins
+            sections = doc.sections
+            for section in sections:
+                section.top_margin = Inches(0.75)
+                section.bottom_margin = Inches(0.75)
+                section.left_margin = Inches(0.75)
+                section.right_margin = Inches(0.75)
+            
+            if campaign_id:
+                # Campaign-specific report
+                filename = f"campaign_report_{campaign.name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.docx"
+                
+                # Title
+                title = doc.add_heading(f'Campaign Report: {campaign.name}', 0)
+                title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                title_run = title.runs[0]
+                title_run.font.color.rgb = RGBColor(0, 102, 204)
+                
+                # Campaign Summary Section
+                doc.add_heading('Campaign Summary', level=1)
+                summary_table = doc.add_table(rows=5, cols=2)
+                summary_table.style = 'Light Grid Accent 1'
+                
+                summary_data = [
+                    ('Campaign Name', campaign.name),
+                    ('Subject', campaign.subject),
+                    ('Status', campaign.status.upper()),
+                    ('Created', campaign.created_at.strftime('%Y-%m-%d %H:%M')),
+                    ('Sent', campaign.sent_at.strftime('%Y-%m-%d %H:%M') if campaign.sent_at else 'Not sent yet')
+                ]
+                
+                for i, (label, value) in enumerate(summary_data):
+                    row = summary_table.rows[i]
+                    row.cells[0].text = label
+                    row.cells[1].text = str(value)
+                    # Bold labels
+                    row.cells[0].paragraphs[0].runs[0].font.bold = True
+                
+                doc.add_paragraph()  # Spacing
+                
+                # Statistics Section
+                doc.add_heading('Statistics', level=1)
+                stats_table = doc.add_table(rows=5, cols=2)
+                stats_table.style = 'Light Grid Accent 1'
+                
+                stats_data = [
+                    ('Total Recipients', campaign.total_recipients),
+                    ('Emails Sent', campaign.sent_count),
+                    ('Failed', campaign.failed_count),
+                    ('Opened', campaign.open_count),
+                    ('Clicked', campaign.click_count)
+                ]
+                
+                for i, (label, value) in enumerate(stats_data):
+                    row = stats_table.rows[i]
+                    row.cells[0].text = label
+                    row.cells[1].text = str(value)
+                    row.cells[0].paragraphs[0].runs[0].font.bold = True
+                    
+                    # Color code based on metric
+                    if label == 'Failed' and value > 0:
+                        row.cells[1].paragraphs[0].runs[0].font.color.rgb = RGBColor(220, 53, 69)
+                    elif label in ['Emails Sent', 'Opened', 'Clicked']:
+                        row.cells[1].paragraphs[0].runs[0].font.color.rgb = RGBColor(40, 167, 69)
+                
+                doc.add_paragraph()  # Spacing
+                
+                # Recipient Details Section
+                doc.add_heading('Recipient Details', level=1)
+                
+                # Create recipient table
+                recipient_table = doc.add_table(rows=1, cols=4)
+                recipient_table.style = 'Light Grid Accent 1'
+                
+                # Header row
+                header_cells = recipient_table.rows[0].cells
+                headers = ['Email', 'Status', 'Sent At', 'Error']
+                for i, header in enumerate(headers):
+                    header_cells[i].text = header
+                    header_cells[i].paragraphs[0].runs[0].font.bold = True
+                    header_cells[i].paragraphs[0].runs[0].font.color.rgb = RGBColor(255, 255, 255)
+                    # Blue background for header
+                    from docx.oxml.ns import nsdecls
+                    from docx.oxml import parse_xml
+                    shading_elm = parse_xml(r'<w:shd {} w:fill="0066CC"/>'.format(nsdecls('w')))
+                    header_cells[i]._element.get_or_add_tcPr().append(shading_elm)
+                
+                # Add recipient rows
+                for log in logs[:100]:  # Limit to 100 for document size
+                    row_cells = recipient_table.add_row().cells
+                    row_cells[0].text = log.recipient_email
+                    row_cells[1].text = log.status.upper()
+                    row_cells[2].text = log.sent_at.strftime('%Y-%m-%d %H:%M') if log.sent_at else '-'
+                    row_cells[3].text = log.error_message[:50] if log.error_message else '-'
+                    
+                    # Color code status
+                    if log.status == 'sent':
+                        row_cells[1].paragraphs[0].runs[0].font.color.rgb = RGBColor(40, 167, 69)
+                    elif log.status == 'failed':
+                        row_cells[1].paragraphs[0].runs[0].font.color.rgb = RGBColor(220, 53, 69)
+                
+                if logs.count() > 100:
+                    doc.add_paragraph(f'Showing first 100 of {logs.count()} recipients', style='Intense Quote')
+            
+            else:
+                # Overall stats report
+                filename = f"campaign_stats_{datetime.now().strftime('%Y%m%d')}.docx"
+                
+                title = doc.add_heading('Campaign Analytics Report', 0)
+                title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                title_run = title.runs[0]
+                title_run.font.color.rgb = RGBColor(0, 102, 204)
+                
+                doc.add_heading('Overall Statistics', level=1)
+                stats_table = doc.add_table(rows=3, cols=2)
+                stats_table.style = 'Light Grid Accent 1'
+                
+                overall_stats = [
+                    ('Total Sent', stats['total_sent']),
+                    ('Total Failed', stats['total_failed']),
+                    ('Total Campaigns', stats['total_campaigns'])
+                ]
+                
+                for i, (label, value) in enumerate(overall_stats):
+                    row = stats_table.rows[i]
+                    row.cells[0].text = label
+                    row.cells[1].text = str(value)
+                    row.cells[0].paragraphs[0].runs[0].font.bold = True
+            
+            # Footer
+            doc.add_paragraph()
+            footer_para = doc.add_paragraph()
+            footer_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            footer_run = footer_para.add_run(f'Generated on {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
+            footer_run.font.size = Pt(9)
+            footer_run.font.color.rgb = RGBColor(128, 128, 128)
+            
+            # Save to response
+            from io import BytesIO
+            buffer = BytesIO()
+            doc.save(buffer)
+            buffer.seek(0)
+            
+            response = HttpResponse(
+                buffer.getvalue(),
+                content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            )
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            return response
             
         return Response({'error': 'Invalid type'}, status=400)
 
