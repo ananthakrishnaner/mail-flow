@@ -6,11 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowLeft, Clock, Users, Send, AlertTriangle, FileText, Terminal } from 'lucide-react';
+import { ArrowLeft, Clock, Users, Send, AlertTriangle, FileText, Terminal, Trash2 } from 'lucide-react';
 import api from '@/lib/api';
 import { format } from 'date-fns';
 import { Loader2 } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 interface ServerLog {
     source: 'mailer' | 'scheduler';
@@ -22,6 +23,7 @@ export default function CampaignDetails() {
     const { id } = useParams();
     const navigate = useNavigate();
     const [logs, setLogs] = useState<ServerLog[]>([]);
+    const queryClient = useQueryClient();
 
     const { data: campaign, isLoading: isLoadingCampaign } = useQuery({
         queryKey: ['campaign', id],
@@ -37,6 +39,20 @@ export default function CampaignDetails() {
         queryFn: async () => {
             const { data } = await api.get(`/campaigns/${id}/server-logs`);
             return data as ServerLog[];
+        }
+    });
+
+    const clearLogs = useMutation({
+        mutationFn: async () => {
+            const { data } = await api.post('/clear-logs');
+            return data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['campaign-logs', id] });
+            toast.success('Server logs cleared successfully');
+        },
+        onError: (error: any) => {
+            toast.error(`Failed to clear logs: ${error.message}`);
         }
     });
 
@@ -151,6 +167,16 @@ export default function CampaignDetails() {
                                     >
                                         {isRefetchingLogs ? <Loader2 className="w-3 h-3 animate-spin mr-2" /> : <Clock className="w-3 h-3 mr-2" />}
                                         {isRefetchingLogs ? 'Refreshing...' : 'Pull Latest Logs'}
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => clearLogs.mutate()}
+                                        disabled={clearLogs.isPending}
+                                        className="h-8 border-red-700/30 bg-black hover:bg-red-900/20 text-red-400 hover:text-red-300"
+                                    >
+                                        {clearLogs.isPending ? <Loader2 className="w-3 h-3 animate-spin mr-2" /> : <Trash2 className="w-3 h-3 mr-2" />}
+                                        {clearLogs.isPending ? 'Clearing...' : 'Clear Logs'}
                                     </Button>
                                 </div>
                             </CardHeader>

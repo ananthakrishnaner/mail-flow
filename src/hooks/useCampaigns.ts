@@ -77,13 +77,26 @@ export const useCampaigns = () => {
   });
 
   const startCampaign = useMutation({
-    mutationFn: async ({ campaignId, delaySeconds }: { campaignId: string; delaySeconds: number }) => {
-      const { data } = await api.post(`/campaigns/${campaignId}/start`, { delaySeconds });
+    mutationFn: async ({
+      campaignId,
+      delaySeconds,
+      mode = 'start'
+    }: {
+      campaignId: string;
+      delaySeconds: number;
+      mode?: 'draft' | 'start' | 'pause';
+    }) => {
+      const { data } = await api.post(`/campaigns/${campaignId}/start`, { delaySeconds, mode });
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['campaigns'] });
-      toast.success(`Campaign started!`);
+      const modeMessages = {
+        draft: 'Campaign saved as draft',
+        start: 'Campaign started!',
+        pause: 'Campaign paused'
+      };
+      toast.success(modeMessages[data.status as keyof typeof modeMessages] || 'Campaign updated');
     },
     onError: (error: any) => {
       toast.error(`Failed to start campaign: ${error.message}`);

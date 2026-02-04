@@ -308,6 +308,56 @@ class CampaignServerLogsView(APIView):
         except Exception as e:
             return Response({'error': str(e)}, status=500)
 
+class ClearLogsView(APIView):
+    """Clear server log files (mailer.log and scheduler.log)"""
+    def post(self, request):
+        try:
+            log_path = os.path.join(settings.BASE_DIR, 'mailer.log')
+            scheduler_log_path = os.path.join(settings.BASE_DIR, 'scheduler.log')
+            
+            cleared = []
+            errors = []
+            
+            for path, name in [(log_path, 'mailer.log'), (scheduler_log_path, 'scheduler.log')]:
+                try:
+                    if os.path.exists(path):
+                        # Clear file by opening in write mode
+                        with open(path, 'w') as f:
+                            f.write('')
+                        cleared.append(name)
+                        logger.info(f"API: Cleared log file: {name}")
+                    else:
+                        errors.append(f"{name} does not exist")
+                except PermissionError:
+                    errors.append(f"Permission denied for {name}")
+                except Exception as e:
+                    errors.append(f"Failed to clear {name}: {str(e)}")
+            
+            if cleared and not errors:
+                return Response({
+                    'success': True,
+                    'message': f'Cleared {", ".join(cleared)}',
+                    'cleared': cleared
+                })
+            elif cleared and errors:
+                return Response({
+                    'success': True,
+                    'message': f'Partially cleared. Errors: {", ".join(errors)}',
+                    'cleared': cleared,
+                    'errors': errors
+                })
+            else:
+                return Response({
+                    'success': False,
+                    'message': 'Failed to clear logs',
+                    'errors': errors
+                }, status=500)
+                
+        except Exception as e:
+            logger.error(f"API: Error clearing logs: {e}")
+            return Response({'error': str(e)}, status=500)
+
+
 # --- Stats ---
 class StatsSummaryView(APIView):
     def get(self, request):
