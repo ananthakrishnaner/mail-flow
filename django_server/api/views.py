@@ -189,8 +189,8 @@ class CampaignStatusView(APIView):
 class CampaignStartView(APIView):
     def post(self, request, pk):
         base_url = f"{request.scheme}://{request.get_host()}"
-        # Start in background
-        process_campaign(pk, base_url)
+        # Start in background, but only after transaction commits to ensure thread sees data
+        transaction.on_commit(lambda: process_campaign(pk, base_url))
         return Response({'success': True, 'message': 'Campaign started'})
 
 # --- Logs ---
