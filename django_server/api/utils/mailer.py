@@ -319,17 +319,14 @@ def process_campaign_task(campaign_id, base_url):
             campaign.save()
             return
 
-        # Get recipients - Refactored for debugging
+        # Get recipients - Simplified approach with fallbacks
         recipient_ids = campaign.recipient_ids
         
-        # DEBUG LOGGING
         logger.info(f"DEBUG: Campaign {campaign_id} raw recipient_ids (Type: {type(recipient_ids)}): {recipient_ids}")
         
         # Ensure it's a list
         if isinstance(recipient_ids, str):
              try:
-                 # Helper to handle Python list string format (single quotes) which json.loads fails on
-                 # e.g. "['uuid1', 'uuid2']"
                  import ast
                  recipient_ids = ast.literal_eval(recipient_ids)
                  logger.info(f"DEBUG: Parsed recipient_ids via ast: {recipient_ids}")
@@ -341,42 +338,62 @@ def process_campaign_task(campaign_id, base_url):
                  except Exception as json_e:
                      logger.error(f"DEBUG: JSON parsing failed: {json_e}")
         
-        # Sanitize to UUID objects to avoid DB driver issues
-        logger.info(f"DEBUG: Starting UUID sanitization for {len(recipient_ids) if isinstance(recipient_ids, list) else 'unknown'} items")
+        if not isinstance(recipient_ids, list):
+            logger.error(f"CRITICAL: recipient_ids is not a list after parsing: {type(recipient_ids)}")
+            campaign.status = 'failed'
+            campaign.save()
+            return
+        
+        logger.info(f"DEBUG: Attempting to fetch {len(recipient_ids)} recipients from DB...")
+        
+        # Try fetching recipients with multiple strategies
+        recipients_list = []
+        count = 0
+        
+        # Strategy 1: Direct query (works if IDs are already UUID objects or strings)
         try:
-            valid_uuids = []
-            for idx, rid in enumerate(recipient_ids):
-                logger.info(f"DEBUG: Processing UUID #{idx+1}: {rid} (Type: {type(rid)})")
-                if isinstance(rid, str):
-                    try:
-                        uuid_obj = uuid.UUID(rid)
-                        valid_uuids.append(uuid_obj)
-                        logger.info(f"DEBUG: Successfully converted to UUID: {uuid_obj}")
-                    except ValueError as ve:
-                        logger.warning(f"Invalid UUID string found: {rid} - Error: {ve}")
-                elif isinstance(rid, uuid.UUID):
-                    valid_uuids.append(rid)
-                    logger.info(f"DEBUG: Already a UUID object: {rid}")
-                else:
-                    logger.warning(f"DEBUG: Skipping non-string/non-UUID item: {rid}")
-            
-            recipient_ids = valid_uuids
-            logger.info(f"DEBUG: Final Validated UUIDs count: {len(recipient_ids)}")
-        except Exception as e:
-            logger.error(f"Error sanitizing UUIDs: {e}")
-            import traceback
-            logger.error(f"Traceback: {traceback.format_exc()}")
-
-        logger.info(f"DEBUG: Executing DB Query...")
-        try:
+            logger.info("DEBUG: Strategy 1 - Direct query with raw IDs")
             recipients_list = list(EmailRecipient.objects.filter(id__in=recipient_ids))
             count = len(recipients_list)
+            logger.info(f"DEBUG: Strategy 1 result: {count} recipients")
         except Exception as e:
-            logger.error(f"CRITICAL DB CRASH during recipient fetch: {e}")
-            recipients_list = []
-            count = 0
+            logger.warning(f"DEBUG: Strategy 1 failed: {e}")
+        
+        # Strategy 2: Convert to UUID objects if Strategy 1 failed
+        if count == 0 and len(recipient_ids) > 0:
+            try:
+                logger.info("DEBUG: Strategy 2 - Converting to UUID objects")
+                uuid_list = []
+                for rid in recipient_ids:
+                    if isinstance(rid, str):
+                        uuid_list.append(uuid.UUID(rid))
+                    elif isinstance(rid, uuid.UUID):
+                        uuid_list.append(rid)
+                
+                recipients_list = list(EmailRecipient.objects.filter(id__in=uuid_list))
+                count = len(recipients_list)
+                logger.info(f"DEBUG: Strategy 2 result: {count} recipients")
+            except Exception as e:
+                logger.error(f"DEBUG: Strategy 2 failed: {e}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
+        
+        # Strategy 3: Fetch one by one if both failed
+        if count == 0 and len(recipient_ids) > 0:
+            try:
+                logger.info("DEBUG: Strategy 3 - Fetching one by one")
+                for rid in recipient_ids:
+                    try:
+                        r = EmailRecipient.objects.get(id=rid)
+                        recipients_list.append(r)
+                    except EmailRecipient.DoesNotExist:
+                        logger.warning(f"DEBUG: Recipient {rid} not found")
+                count = len(recipients_list)
+                logger.info(f"DEBUG: Strategy 3 result: {count} recipients")
+            except Exception as e:
+                logger.error(f"DEBUG: Strategy 3 failed: {e}")
             
-        logger.info(f"DEBUG: Database found {count} recipients for IDs: {recipient_ids}")
+        logger.info(f"DEBUG: FINAL - Database found {count} recipients")
         
         if count == 0 and len(recipient_ids) > 0:
             logger.error("CRITICAL: Recipient IDs provided but no objects found in DB!")
