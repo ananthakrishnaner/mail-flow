@@ -19,8 +19,6 @@ import {
   BarChart,
   Bar,
   Legend,
-  LineChart,
-  Line,
 } from 'recharts';
 import { format } from 'date-fns';
 import {
@@ -30,12 +28,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-const COLORS = ['hsl(173, 80%, 40%)', 'hsl(0, 72%, 51%)', 'hsl(38, 92%, 50%)', 'hsl(220, 70%, 50%)'];
-
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SecurityAnalytics } from "@/components/analytics/SecurityAnalytics";
+import { ComparisonAnalyser } from "@/components/analytics/ComparisonAnalyser";
 import { API_URL } from '@/lib/api';
+
+const COLORS = ['hsl(173, 80%, 40%)', 'hsl(0, 72%, 51%)', 'hsl(38, 92%, 50%)', 'hsl(220, 70%, 50%)'];
 
 export default function Analytics() {
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>('all');
@@ -54,9 +52,6 @@ export default function Analytics() {
       </DashboardLayout>
     );
   }
-
-  // ... (keep chart data preparation logic) ...
-  // copy lines 54-101 here for reference, but in reality I will just keep them and wrap the return statement.
 
   const emailStatusData = [
     { name: 'Sent', value: stats.totalSent, color: 'hsl(173, 80%, 40%)' },
@@ -134,6 +129,7 @@ export default function Analytics() {
           <TabsList>
             <TabsTrigger value="campaigns">Campaign Analytics</TabsTrigger>
             <TabsTrigger value="security">Analysis of Data</TabsTrigger>
+            <TabsTrigger value="comparison">Comparison Analyser</TabsTrigger>
           </TabsList>
 
           <TabsContent value="campaigns" className="space-y-6">
@@ -597,8 +593,12 @@ export default function Analytics() {
           <TabsContent value="security">
             <SecurityAnalytics />
           </TabsContent>
+
+          <TabsContent value="comparison">
+            <ComparisonAnalyser />
+          </TabsContent>
         </Tabs>
       </div>
-    </DashboardLayout >
+    </DashboardLayout>
   );
 }

@@ -949,7 +949,7 @@ class StatsExportView(APIView):
                     header_cells[i]._element.get_or_add_tcPr().append(shading_elm)
                 
                 # Add recipient rows
-                for log in logs[:100]:  # Limit to 100 for document size
+                for log in logs:
                     row_cells = recipient_table.add_row().cells
                     row_cells[0].text = log.recipient_email
                     row_cells[1].text = log.status.upper()
@@ -961,9 +961,6 @@ class StatsExportView(APIView):
                         row_cells[1].paragraphs[0].runs[0].font.color.rgb = RGBColor(40, 167, 69)
                     elif log.status == 'failed':
                         row_cells[1].paragraphs[0].runs[0].font.color.rgb = RGBColor(220, 53, 69)
-                
-                if logs.count() > 100:
-                    doc.add_paragraph(f'Showing first 100 of {logs.count()} recipients', style='Intense Quote')
             
             else:
                 # Overall stats report
@@ -1030,12 +1027,17 @@ class SecurityLogExportView(APIView):
             response['Content-Disposition'] = f'attachment; filename="{filename}"'
             
             writer = csv.writer(response)
-            writer.writerow(['Time', 'Email', 'IP Address', 'Attempt Status', 'Review Status', 'User Agent'])
+            writer.writerow(['Time', 'Email', 'IP Address', 'Attempt Status', 'Review Status', 'User Agent', 'Input Details'])
+            
+            seen_emails = set()
             for log in logs:
-                writer.writerow([
-                    log.created_at, log.email, log.ip_address, 
-                    log.attempt_status, log.review_status, log.user_agent
-                ])
+                if log.email not in seen_emails:
+                    writer.writerow([
+                        log.created_at, log.email, log.ip_address, 
+                        log.attempt_status, log.review_status, log.user_agent,
+                        log.input_details
+                    ])
+                    seen_emails.add(log.email)
             return response
             
         elif export_type == 'pdf':

@@ -9,6 +9,7 @@ from .views import (
     SecurityLogImportView, SecurityLogAnalyticsView, SecurityLogActionView,
     StatsExportView, SecurityLogExportView, SecurityLogBulkView, ClearLogsView
 )
+from .comparison_views import ComparisonAnalyticsView, ComparisonExportView
 
 urlpatterns = [
     path('config', ConfigView.as_view()),
@@ -39,4 +40,7 @@ urlpatterns = [
     path('security/export', SecurityLogExportView.as_view()),
     path('security/bulk', SecurityLogBulkView.as_view()),
     path('clear-logs', ClearLogsView.as_view()),
+    
+    path('comparison/analytics', ComparisonAnalyticsView.as_view()),
+    path('comparison/export', ComparisonExportView.as_view()),
 ]
