@@ -126,7 +126,7 @@ export default function Analytics() {
         </div>
 
         <Tabs defaultValue="campaigns" className="space-y-4">
-          <TabsList>
+          <TabsList className="w-full justify-start overflow-x-auto">
             <TabsTrigger value="campaigns">Campaign Analytics</TabsTrigger>
             <TabsTrigger value="security">Analysis of Data</TabsTrigger>
             <TabsTrigger value="comparison">Comparison Analyser</TabsTrigger>
