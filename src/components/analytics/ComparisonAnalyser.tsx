@@ -1,14 +1,14 @@
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Download, Fingerprint, Mail, RefreshCw, Layers } from 'lucide-react';
+import { Download, Fingerprint, Mail, RefreshCw, Layers, Upload, FileText } from 'lucide-react';
 import api, { API_URL } from '@/lib/api';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
 interface ComparisonMatch {
-    id: string; // from security log id
+    id: string;
     email: string;
     sent_at: string;
     security_date: string;
@@ -16,66 +16,171 @@ interface ComparisonMatch {
 }
 
 interface ComparisonStats {
-    total_sent_unique: number; // Unique emails sent
-    total_matches_unique: number; // Unique emails matched
+    total_sent_unique: number;
+    total_matches_unique: number;
 }
 
 export const ComparisonAnalyser = () => {
     const [matches, setMatches] = useState<ComparisonMatch[]>([]);
     const [stats, setStats] = useState<ComparisonStats | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [file, setFile] = useState<File | null>(null);
+    const [isExporting, setIsExporting] = useState(false);
 
-    const fetchData = async () => {
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            setFile(e.target.files[0]);
+        }
+    };
+
+    const handleAnalyze = async () => {
+        if (!file) {
+            toast.error("Please upload a CSV file first.");
+            return;
+        }
+
         setIsLoading(true);
+        const formData = new FormData();
+        formData.append('file', file);
+
         try {
-            const res = await api.get('/comparison/analytics');
+            const res = await api.post('/comparison/analytics', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            });
             setMatches(res.data.matches);
             setStats(res.data.stats);
+            toast.success("Analysis complete");
         } catch (error) {
             console.error('Failed to fetch comparison data', error);
-            toast.error('Failed to load comparison data');
+            toast.error('Failed to analyze data. Ensure CSV has an "email" column.');
         } finally {
             setIsLoading(false);
         }
     };
 
-    useEffect(() => {
-        fetchData();
-    }, []);
+    const handleDownloadSample = () => {
+        const csvContent = "data:text/csv;charset=utf-8," + "email,sent_at\nexample@test.com,2024-01-01 10:00:00\nanother@test.com,2024-01-02 11:30:00";
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "sample_comparison_upload.csv");
+        document.body.appendChild(link); // Required for FF
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const handleExportReport = async () => {
+        if (!file) {
+            toast.error("Please upload a CSV file to generate the report.");
+            return;
+        }
+
+        setIsExporting(true);
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            // We can't use api.post for blob response easily with the interceptor setup sometimes, 
+            // but let's try standard fetch for blob download to be safe or use axios with responseType
+            const response = await api.post('/comparison/export', formData, {
+                responseType: 'blob',
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                }
+            });
+
+            // Create download link
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', 'comparison_analysis_report.docx');
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            toast.success("Report downloaded successfully");
+        } catch (error) {
+            console.error('Export failed', error);
+            toast.error("Failed to export report");
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
+    const handleReset = () => {
+        setFile(null);
+        setMatches([]);
+        setStats(null);
+        // Reset file input value
+        const fileInput = document.getElementById('csv-upload') as HTMLInputElement;
+        if (fileInput) fileInput.value = '';
+    };
 
     const chartData = stats ? [
-        { name: 'Sent Emails', value: stats.total_sent_unique, fill: '#0ea5e9' },
+        { name: 'CSV Emails', value: stats.total_sent_unique, fill: '#0ea5e9' },
         { name: 'Security Matches', value: stats.total_matches_unique, fill: '#ef4444' }
     ] : [];
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
                     <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
                         Comparison Analyser
                     </h2>
                     <p className="text-muted-foreground text-sm mt-1">
-                        Analyze correlation between sent campaigns and security events
+                        Upload Sent Campaign CSV to compare against Security Logs (Matches {'>'} 2 chars)
                     </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-3">
                     <button
-                        onClick={fetchData}
-                        className="p-2 bg-card border border-border rounded-lg hover:bg-muted transition-colors"
-                        title="Refresh Data"
+                        onClick={handleDownloadSample}
+                        className="flex items-center gap-2 px-3 py-2 text-xs bg-muted border border-border rounded-lg hover:bg-muted/80 transition-colors"
                     >
-                        <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
+                        <FileText size={14} /> Download Sample CSV
                     </button>
-                    <a
-                        href={`${API_URL}/comparison/export`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors shadow-lg hover:shadow-purple-500/25"
+
+                    <div className="relative">
+                        <input
+                            id="csv-upload"
+                            type="file"
+                            accept=".csv"
+                            onChange={handleFileChange}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        />
+                        <button className={`flex items-center gap-2 px-4 py-2 border border-border rounded-lg transition-colors ${file ? 'bg-primary/10 border-primary text-primary' : 'bg-card hover:bg-muted'}`}>
+                            <Upload size={16} />
+                            {file ? file.name : 'Upload CSV'}
+                        </button>
+                    </div>
+
+                    {file && (
+                        <button
+                            onClick={handleReset}
+                            className="flex items-center gap-2 px-4 py-2 bg-destructive/10 text-destructive hover:bg-destructive/20 border border-destructive/20 rounded-lg transition-colors"
+                        >
+                            Reset
+                        </button>
+                    )}
+
+                    <button
+                        onClick={handleAnalyze}
+                        disabled={isLoading || !file}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        <Download size={18} />
-                        Comparison Report (Word)
-                    </a>
+                        <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
+                        {stats ? 'Re-Compare' : 'Analyze'}
+                    </button>
+
+                    <button
+                        onClick={handleExportReport}
+                        disabled={isExporting || !file}
+                        className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors shadow-lg hover:shadow-purple-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <Download size={16} className={isExporting ? 'animate-pulse' : ''} />
+                        {isExporting ? 'Generating...' : 'Report (Word)'}
+                    </button>
                 </div>
             </div>
 
@@ -85,12 +190,12 @@ export const ComparisonAnalyser = () => {
                 <div className="grid grid-cols-1 gap-4 lg:col-span-1">
                     <Card className="bg-card border-border">
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Total Sent (Unique)</CardTitle>
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Emails in CSV</CardTitle>
                             <Mail className="h-4 w-4 text-sky-500" />
                         </CardHeader>
                         <CardContent>
                             <div className="text-2xl font-bold">{stats?.total_sent_unique || 0}</div>
-                            <p className="text-xs text-muted-foreground mt-1">Unique recipients targeted</p>
+                            <p className="text-xs text-muted-foreground mt-1">Unique emails processed</p>
                         </CardContent>
                     </Card>
 
@@ -101,13 +206,13 @@ export const ComparisonAnalyser = () => {
                         </CardHeader>
                         <CardContent>
                             <div className="text-2xl font-bold text-red-500">{stats?.total_matches_unique || 0}</div>
-                            <p className="text-xs text-muted-foreground mt-1">Recipients with security logs</p>
+                            <p className="text-xs text-muted-foreground mt-1">Matched logs with details {'>'} 2 chars</p>
                         </CardContent>
                     </Card>
 
                     <Card className="bg-card border-border">
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Conversion Rate</CardTitle>
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Match Rate</CardTitle>
                             <Layers className="h-4 w-4 text-purple-500" />
                         </CardHeader>
                         <CardContent>
@@ -116,7 +221,7 @@ export const ComparisonAnalyser = () => {
                                     ? ((stats.total_matches_unique / stats.total_sent_unique) * 100).toFixed(1)
                                     : 0}%
                             </div>
-                            <p className="text-xs text-muted-foreground mt-1">Sent to Security Event ratio</p>
+                            <p className="text-xs text-muted-foreground mt-1">CSV to Security Log ratio</p>
                         </CardContent>
                     </Card>
                 </div>
@@ -158,7 +263,7 @@ export const ComparisonAnalyser = () => {
                         <thead className="bg-muted/50 border-b border-border">
                             <tr>
                                 <th className="p-4 font-medium text-muted-foreground">Email Address</th>
-                                <th className="p-4 font-medium text-muted-foreground">Sent Date</th>
+                                <th className="p-4 font-medium text-muted-foreground">Sent Date (CSV)</th>
                                 <th className="p-4 font-medium text-muted-foreground">Security Log Date</th>
                                 <th className="p-4 font-medium text-muted-foreground">Input Details</th>
                             </tr>
@@ -167,7 +272,7 @@ export const ComparisonAnalyser = () => {
                             {matches.length === 0 ? (
                                 <tr>
                                     <td colSpan={4} className="p-8 text-center text-muted-foreground">
-                                        No matches found between Sent campaigns and Security logs.
+                                        {file ? "No filtered matches found in uploaded CSV." : "Upload a CSV file and click Analyze to see results."}
                                     </td>
                                 </tr>
                             ) : (
@@ -175,7 +280,7 @@ export const ComparisonAnalyser = () => {
                                     <tr key={idx} className="hover:bg-muted/30 transition-colors">
                                         <td className="p-4 font-medium">{match.email}</td>
                                         <td className="p-4 text-muted-foreground">
-                                            {match.sent_at ? format(new Date(match.sent_at), 'MMM dd, yyyy HH:mm') : '-'}
+                                            {match.sent_at || '-'}
                                         </td>
                                         <td className="p-4 text-muted-foreground">
                                             {match.security_date ? format(new Date(match.security_date), 'MMM dd, yyyy HH:mm') : '-'}
