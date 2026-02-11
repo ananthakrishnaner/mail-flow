@@ -455,6 +455,7 @@ export const ComparisonAnalyser = () => {
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800">
+                                        <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest w-16">SL NO</th>
                                         <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Subscriber Identity</th>
                                         <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Reconciliation Data</th>
                                         <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">System Details</th>
@@ -463,6 +464,9 @@ export const ComparisonAnalyser = () => {
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                                     {matches.map((match, idx) => (
                                         <tr key={match.id + idx} className="hover:bg-slate-50/30 dark:hover:bg-slate-900/30 transition-colors">
+                                            <td className="px-8 py-6 text-[10px] font-bold text-slate-400">
+                                                {(idx + 1).toString().padStart(2, '0')}
+                                            </td>
                                             <td className="px-8 py-6">
                                                 <div className="flex flex-col">
                                                     <span className="text-sm font-semibold text-slate-900 dark:text-slate-100 tracking-tight">{match.email}</span>
