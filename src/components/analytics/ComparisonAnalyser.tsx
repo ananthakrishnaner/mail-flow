@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Download, Fingerprint, Mail, RefreshCw, Layers, Upload, FileText, UserCheck } from 'lucide-react';
@@ -39,11 +39,8 @@ export const ComparisonAnalyser = () => {
         }
     };
 
-    const handleAnalyze = async () => {
-        if (!file) {
-            toast.error("Please upload a CSV file first.");
-            return;
-        }
+    const handleAnalyze = useCallback(async () => {
+        if (!file) return;
 
         setIsLoading(true);
         const formData = new FormData();
@@ -59,14 +56,21 @@ export const ComparisonAnalyser = () => {
             });
             setMatches(res.data.matches);
             setStats(res.data.stats);
-            toast.success("Analysis complete");
+            // toast.success("Analysis complete"); // Silent for reactivity
         } catch (error) {
             console.error('Failed to fetch comparison data', error);
-            toast.error('Failed to analyze data. Ensure CSV has an "email" column.');
+            toast.error('Failed to analyze data.');
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [file, minLength, uniqueOnly]);
+
+    // Reactivity: Auto-analyze on setting change
+    useEffect(() => {
+        if (file) {
+            handleAnalyze();
+        }
+    }, [uniqueOnly, minLength, handleAnalyze]);
 
     const handleDownloadSample = () => {
         const csvContent = "data:text/csv;charset=utf-8," + "email,sent_at,date\nexample@test.com,2024-01-01 10:00:00,2024-01-01\nanother@test.com,2024-01-02 11:30:00,2024-01-02";
@@ -161,8 +165,8 @@ export const ComparisonAnalyser = () => {
     };
 
     const chartData = stats ? [
-        { name: 'CSV Emails', value: stats.total_sent_unique, fill: '#0ea5e9' },
-        { name: 'Security Matches', value: stats.total_matches, fill: '#ef4444' }
+        { name: 'CSV Total', value: stats.total_sent_unique, fill: 'hsl(var(--foreground))' },
+        { name: 'Matches', value: stats.total_matches, fill: 'hsl(var(--foreground)/0.3)' }
     ] : [];
 
     return (
@@ -178,15 +182,15 @@ export const ComparisonAnalyser = () => {
                 </div>
                 <div className="flex flex-wrap gap-4 items-center">
                     {/* Input Group */}
-                    <div className="flex items-center gap-2 p-1.5 bg-zinc-900/50 border border-border rounded-xl shadow-inner">
+                    <div className="flex items-center gap-2 p-1 bg-white dark:bg-zinc-900 border border-black/10 dark:border-white/10 rounded-lg shadow-sm">
                         <button
                             onClick={handleDownloadSample}
-                            className="p-1.5 text-zinc-500 hover:text-zinc-300 transition-colors"
+                            className="p-1.5 text-zinc-400 hover:text-black dark:hover:text-white transition-colors"
                             title="Download Sample CSV"
                         >
                             <FileText size={16} />
                         </button>
-                        <div className="h-4 w-px bg-border" />
+                        <div className="h-4 w-px bg-black/10 dark:bg-white/10" />
                         <div className="relative">
                             <input
                                 id="csv-upload"
@@ -195,7 +199,7 @@ export const ComparisonAnalyser = () => {
                                 onChange={handleFileChange}
                                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                             />
-                            <button className={`flex items-center gap-2 px-4 py-1.5 text-sm rounded-lg transition-all ${file ? 'bg-primary/20 text-primary border border-primary/20 font-medium' : 'bg-transparent text-zinc-400 hover:text-white'}`}>
+                            <button className={`flex items-center gap-2 px-4 py-1.5 text-sm font-medium rounded-md transition-all ${file ? 'text-black dark:text-white bg-black/5 dark:bg-white/5' : 'text-zinc-400 hover:text-black dark:hover:text-white'}`}>
                                 <Upload size={14} />
                                 <span className="max-w-[120px] truncate">{file ? file.name : 'Upload CSV'}</span>
                             </button>
@@ -203,7 +207,7 @@ export const ComparisonAnalyser = () => {
                         {file && (
                             <button
                                 onClick={handleReset}
-                                className="p-1.5 text-zinc-500 hover:text-destructive transition-colors ml-1"
+                                className="p-1.5 text-zinc-400 hover:text-red-500 transition-colors ml-1"
                                 title="Clear file"
                             >
                                 <RefreshCw size={14} />
@@ -212,61 +216,72 @@ export const ComparisonAnalyser = () => {
                     </div>
 
                     {/* Settings Group */}
-                    <div className="flex items-center gap-3 px-3 py-1.5 bg-zinc-900/50 border border-border rounded-xl shadow-inner">
-                        <div className="flex items-center gap-2 border-r border-border pr-3">
-                            <span className="text-[10px] uppercase tracking-wider font-bold text-zinc-500">Min Len:</span>
+                    <div className="flex items-center gap-3 px-3 py-1 bg-white dark:bg-zinc-900 border border-black/10 dark:border-white/10 rounded-lg shadow-sm">
+                        <div className="flex items-center gap-2 border-r border-black/10 dark:border-white/10 pr-3 font-mono">
+                            <span className="text-[10px] uppercase font-bold text-zinc-500">Min:</span>
                             <input
                                 type="number"
                                 min="0"
                                 max="50"
-                                className="w-8 bg-transparent border-none text-xs focus:ring-0 p-0 text-center font-mono text-white"
+                                className="w-8 bg-transparent border-none text-xs focus:ring-0 p-0 text-center font-bold text-black dark:text-white"
                                 value={minLength}
                                 onChange={(e) => setMinLength(parseInt(e.target.value) || 0)}
                             />
                         </div>
                         <button
                             onClick={() => setUniqueOnly(!uniqueOnly)}
-                            className={`flex items-center gap-2 text-xs font-bold uppercase tracking-tight transition-all py-1.5 px-3 rounded-lg border ${uniqueOnly
-                                ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.1)]'
-                                : 'text-zinc-500 border-transparent hover:text-zinc-300 hover:bg-zinc-800'
+                            className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest transition-all py-1.5 px-3 rounded-md border ${uniqueOnly
+                                ? 'bg-black text-white border-black dark:bg-white dark:text-black dark:border-white'
+                                : 'text-zinc-400 border-transparent hover:text-black dark:hover:text-white'
                                 }`}
                         >
                             <UserCheck size={14} className={uniqueOnly ? 'opacity-100' : 'opacity-40'} />
-                            {uniqueOnly ? 'Unique: On' : 'Unique: Off'}
+                            {uniqueOnly ? 'Unique' : 'All Logs'}
                         </button>
                     </div>
 
                     {/* Action Group */}
-                    <div className="flex items-center gap-2 flex-grow justify-end">
-                        <button
-                            onClick={handleAnalyze}
-                            disabled={isLoading || !file}
-                            className="flex items-center gap-2 px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold rounded-xl transition-all shadow-[0_4px_12px_rgba(37,99,235,0.3)] disabled:opacity-50 disabled:shadow-none hover:translate-y-[-1px] active:translate-y-[1px]"
-                        >
-                            <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
-                            {stats ? 'Re-Compare' : 'Analyze Now'}
-                        </button>
-
-                        <div className="h-8 w-px bg-border mx-2" />
-
-                        <div className="flex bg-zinc-900/50 border border-border rounded-xl overflow-hidden p-0.5 shadow-inner">
+                    <div className="flex items-center gap-2 ml-auto">
+                        {!stats && (
                             <button
-                                onClick={handleExportReport}
-                                disabled={isExporting || !file}
-                                className="p-2 text-zinc-400 hover:text-purple-400 hover:bg-purple-500/10 transition-all rounded-lg"
-                                title="Export Word"
+                                onClick={handleAnalyze}
+                                disabled={isLoading || !file}
+                                className="flex items-center gap-2 px-6 py-2 bg-black text-white dark:bg-white dark:text-black text-xs font-bold uppercase tracking-widest rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80 active:scale-95 shadow-lg shadow-black/10 dark:shadow-white/5"
                             >
-                                <Download size={16} />
+                                <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
+                                Analyze
                             </button>
-                            <button
-                                onClick={handleExportCSV}
-                                disabled={isExportingCSV || !file}
-                                className="p-2 text-zinc-400 hover:text-purple-400 hover:bg-purple-500/10 transition-all rounded-lg"
-                                title="Export CSV"
-                            >
-                                <FileText size={16} />
-                            </button>
-                        </div>
+                        )}
+
+                        {stats && (
+                            <div className="flex bg-white dark:bg-zinc-900 border border-black/10 dark:border-white/10 rounded-lg overflow-hidden p-1 shadow-sm">
+                                <button
+                                    onClick={handleExportReport}
+                                    disabled={isExporting || !file}
+                                    className="p-2 text-zinc-400 hover:text-black dark:hover:text-white transition-all rounded-md"
+                                    title="Download Report"
+                                >
+                                    <Download size={16} />
+                                </button>
+                                <button
+                                    onClick={handleExportCSV}
+                                    disabled={isExportingCSV || !file}
+                                    className="p-2 text-zinc-400 hover:text-black dark:hover:text-white transition-all rounded-md"
+                                    title="Download CSV"
+                                >
+                                    <FileText size={16} />
+                                </button>
+                                <div className="h-6 w-px bg-black/10 dark:bg-white/10 mx-1 self-center" />
+                                <button
+                                    onClick={handleAnalyze}
+                                    disabled={isLoading || !file}
+                                    className="p-2 text-zinc-400 hover:text-black dark:hover:text-white transition-all rounded-md"
+                                    title="Re-run Analysis"
+                                >
+                                    <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -275,65 +290,64 @@ export const ComparisonAnalyser = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Stats Cards */}
                 <div className="grid grid-cols-1 gap-4 lg:col-span-1">
-                    <Card className="bg-card border-border">
+                    <Card className="bg-white dark:bg-zinc-900 border-black/5 dark:border-white/5 shadow-sm">
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Emails in CSV</CardTitle>
-                            <Mail className="h-4 w-4 text-sky-500" />
+                            <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">CSV Population</CardTitle>
+                            <div className="h-1.5 w-1.5 rounded-full bg-black dark:bg-white" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold">{stats?.total_sent_unique || 0}</div>
-                            <p className="text-xs text-muted-foreground mt-1">Unique emails processed</p>
+                            <div className="text-3xl font-bold font-mono tracking-tighter">{stats?.total_sent_unique || 0}</div>
                         </CardContent>
                     </Card>
 
-                    <Card className="bg-card border-border">
+                    <Card className="bg-white dark:bg-zinc-900 border-black/5 dark:border-white/5 shadow-sm">
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Security Matches</CardTitle>
-                            <Fingerprint className="h-4 w-4 text-red-500" />
+                            <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Security Hits</CardTitle>
+                            <div className="h-1.5 w-1.5 rounded-full bg-zinc-400" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold text-red-500">{stats?.total_matches || 0}</div>
-                            <p className="text-xs text-muted-foreground mt-1">Matched logs with details {'>'}= {minLength} chars</p>
+                            <div className="text-3xl font-bold font-mono tracking-tighter">{stats?.total_matches || 0}</div>
                         </CardContent>
                     </Card>
 
-                    <Card className="bg-card border-border">
+                    <Card className="bg-white dark:bg-zinc-900 border-black/5 dark:border-white/5 shadow-sm">
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Match Rate</CardTitle>
-                            <Layers className="h-4 w-4 text-purple-500" />
+                            <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Hit Radius</CardTitle>
+                            <div className="h-1.5 w-1.5 rounded-full bg-zinc-200" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold text-purple-500">
+                            <div className="text-3xl font-bold font-mono tracking-tighter">
                                 {stats && stats.total_sent_unique > 0
-                                    ? ((stats.total_matches / stats.total_sent_unique) * 100).toFixed(1)
+                                    ? ((stats.total_matches / stats.total_sent_unique) * 100).toFixed(0)
                                     : 0}%
                             </div>
-                            <p className="text-xs text-muted-foreground mt-1">CSV to Security Log ratio</p>
                         </CardContent>
                     </Card>
                 </div>
 
                 {/* Graph */}
-                <Card className="lg:col-span-2 bg-card border-border">
-                    <CardHeader>
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Comparison Analysis Graph</CardTitle>
+                <Card className="lg:col-span-2 bg-white dark:bg-zinc-900 border-black/5 dark:border-white/5 shadow-sm overflow-hidden">
+                    <CardHeader className="border-b border-black/5 dark:border-white/5 pb-4">
+                        <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Activity Distribution</CardTitle>
                     </CardHeader>
-                    <CardContent className="h-[300px]">
+                    <CardContent className="h-[280px] pt-6">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={chartData} layout="vertical" margin={{ left: 20 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} horizontal={true} vertical={false} />
-                                <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
-                                <YAxis type="category" dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} width={120} />
+                            <BarChart data={chartData} layout="vertical" margin={{ left: 20, right: 20 }}>
+                                <CartesianGrid strokeDasharray="2 2" stroke="hsl(var(--border))" opacity={0.2} horizontal={true} vertical={false} />
+                                <XAxis type="number" hide />
+                                <YAxis type="category" dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} width={80} />
                                 <Tooltip
                                     contentStyle={{
                                         backgroundColor: 'hsl(var(--card))',
                                         borderColor: 'hsl(var(--border))',
-                                        borderRadius: '8px',
-                                        color: 'hsl(var(--foreground))'
+                                        borderRadius: '4px',
+                                        fontSize: '10px',
+                                        textTransform: 'uppercase',
+                                        fontWeight: 'bold'
                                     }}
-                                    cursor={{ fill: 'hsl(var(--muted)/0.2)' }}
+                                    cursor={{ fill: 'hsl(var(--muted)/0.1)' }}
                                 />
-                                <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={40} />
+                                <Bar dataKey="value" radius={[0, 2, 2, 0]} barSize={32} />
                             </BarChart>
                         </ResponsiveContainer>
                     </CardContent>
