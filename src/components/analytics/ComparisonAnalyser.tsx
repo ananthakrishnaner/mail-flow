@@ -1,8 +1,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Download, Fingerprint, Mail, RefreshCw, Layers, Upload, FileText, UserCheck, PieChart as PieIcon, CheckCircle2, AlertCircle } from 'lucide-react';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { Download, Fingerprint, Mail, RefreshCw, Layers, Upload, FileText, UserCheck, PieChart as PieIcon, CheckCircle2, AlertCircle, ChevronRight, Filter } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api, { API_URL } from '@/lib/api';
 import { format } from 'date-fns';
@@ -166,8 +166,8 @@ export const ComparisonAnalyser = () => {
     };
 
     const chartData = stats ? [
-        { name: 'Total Emails', value: stats.total_sent_unique, fill: '#22c55e' },
-        { name: 'Security Matches', value: stats.total_matches, fill: '#ef4444' }
+        { name: 'Initial Sent', value: stats.total_sent_unique, fill: '#6366f1' },
+        { name: 'Identified Hits', value: stats.total_matches, fill: '#4f46e5' }
     ] : [];
 
     const pieData = stats ? [
@@ -175,36 +175,39 @@ export const ComparisonAnalyser = () => {
         { name: 'Unmatched', value: Math.max(0, stats.total_sent_unique - stats.unique_matches) }
     ] : [];
 
-    const PIE_COLORS = ['#ef4444', '#f97316'];
+    const PIE_COLORS = ['#6366f1', '#e2e8f0'];
 
     return (
         <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="space-y-6 bg-black p-6 min-h-screen text-white"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-8 max-w-[1600px] mx-auto pb-12"
         >
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-zinc-900 border-2 border-zinc-800 p-8 rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.5)] relative overflow-hidden">
-                <div className="relative z-10">
-                    <h2 className="text-4xl font-black tracking-tight text-white uppercase">
-                        Comparison <span className="text-green-500">Analyser</span>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 bg-white dark:bg-zinc-950 p-8 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                <div>
+                    <div className="flex items-center gap-2 mb-2">
+                        <span className="px-2 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-[10px] font-bold uppercase tracking-widest rounded">Analytics Engine</span>
+                        <ChevronRight size={12} className="text-slate-400" />
+                        <span className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Cross-Reference</span>
+                    </div>
+                    <h2 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
+                        Comparison <span className="text-indigo-600">Analyser</span>
                     </h2>
-                    <p className="text-zinc-400 text-lg mt-2 max-w-md font-bold">
-                        High-contrast analysis of campaign reach vs. security hits.
+                    <p className="text-slate-500 dark:text-slate-400 text-sm mt-1 font-medium">
+                        Advanced deliverability diagnostics and security log reconciliation platform.
                     </p>
                 </div>
-                <div className="flex flex-wrap gap-4 items-center relative z-10">
+                <div className="flex flex-wrap gap-4 items-center">
                     {/* Input Group */}
-                    <div className="flex items-center gap-2 p-1.5 bg-black border-2 border-zinc-700 rounded-xl">
-                        <motion.button
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
+                    <div className="flex items-center gap-2 p-1 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-lg">
+                        <button
                             onClick={handleDownloadSample}
-                            className="p-2 text-zinc-400 hover:text-white transition-colors"
-                            title="Download Sample CSV"
+                            className="p-2 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                            title="Download Sample Template"
                         >
-                            <FileText size={20} />
-                        </motion.button>
-                        <div className="h-6 w-0.5 bg-zinc-700" />
+                            <FileText size={18} />
+                        </button>
+                        <div className="h-4 w-px bg-slate-200 dark:bg-slate-800" />
                         <div className="relative">
                             <input
                                 id="csv-upload"
@@ -213,293 +216,285 @@ export const ComparisonAnalyser = () => {
                                 onChange={handleFileChange}
                                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                             />
-                            <button className={`flex items-center gap-2 px-6 py-2 text-sm font-black rounded-lg transition-all ${file ? 'bg-green-600 text-white shadow-lg shadow-green-900/50' : 'bg-transparent text-zinc-400 hover:text-white border-2 border-zinc-800'}`}>
-                                <Upload size={18} />
-                                <span className="max-w-[150px] truncate">{file ? file.name : 'UPLOAD CSV'}</span>
+                            <button className={`flex items-center gap-2 px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${file ? 'bg-indigo-600 text-white shadow-sm' : 'bg-transparent text-slate-500 hover:text-slate-900 dark:hover:text-slate-100'}`}>
+                                <Upload size={14} />
+                                <span className="max-w-[150px] truncate">{file ? file.name : 'Upload Records'}</span>
                             </button>
                         </div>
                         {file && (
-                            <motion.button
-                                whileHover={{ rotate: 180, color: '#ef4444' }}
+                            <button
                                 onClick={handleReset}
-                                className="p-2 text-zinc-500 transition-colors ml-1"
-                                title="Clear file"
+                                className="p-2 text-slate-400 hover:text-red-500 transition-colors ml-1"
+                                title="Reset selection"
                             >
-                                <RefreshCw size={18} />
-                            </motion.button>
+                                <RefreshCw size={14} />
+                            </button>
                         )}
                     </div>
 
                     {/* Settings Group */}
-                    <div className="flex items-center gap-3 px-4 py-1.5 bg-black border-2 border-zinc-700 rounded-xl">
-                        <div className="flex items-center gap-2 border-r-2 border-zinc-700 pr-4 font-mono">
-                            <span className="text-xs uppercase font-black text-orange-500">LENGTH:</span>
+                    <div className="flex items-center gap-3 px-3 py-1 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-lg">
+                        <div className="flex items-center gap-2 border-r border-slate-200 dark:border-slate-800 pr-3">
+                            <Filter size={14} className="text-slate-400" />
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">MIN LENGTH</span>
                             <input
                                 type="number"
                                 min="0"
                                 max="50"
-                                className="w-12 bg-transparent border-none text-base focus:ring-0 p-0 text-center font-black text-white"
+                                className="w-8 bg-transparent border-none text-sm focus:ring-0 p-0 text-center font-bold text-slate-900 dark:text-slate-100"
                                 value={minLength}
                                 onChange={(e) => setMinLength(parseInt(e.target.value) || 0)}
                             />
                         </div>
-                        <motion.button
-                            whileHover={{ backgroundColor: uniqueOnly ? '#000' : '#f97316', color: uniqueOnly ? '#f97316' : '#fff' }}
+                        <button
                             onClick={() => setUniqueOnly(!uniqueOnly)}
-                            className={`flex items-center gap-2 text-xs font-black uppercase tracking-widest transition-all py-2 px-6 rounded-lg border-2 ${uniqueOnly
-                                ? 'bg-orange-600 text-white border-orange-500 shadow-lg shadow-orange-900/50'
-                                : 'text-zinc-400 border-zinc-700 hover:text-white'
+                            className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest transition-all py-1.5 px-4 rounded-md border ${uniqueOnly
+                                ? 'bg-slate-900 text-white border-slate-900 dark:bg-slate-100 dark:text-slate-900 dark:border-slate-100 shadow-sm'
+                                : 'text-slate-400 border-transparent hover:text-slate-900 dark:hover:text-slate-100'
                                 }`}
                         >
-                            <UserCheck size={18} />
-                            {uniqueOnly ? 'UNIQUE ON' : 'DUPLICATES'}
-                        </motion.button>
+                            <UserCheck size={14} />
+                            {uniqueOnly ? 'Strict Mode' : 'Standard'}
+                        </button>
                     </div>
 
                     {/* Action Group */}
-                    <div className="flex items-center gap-4 ml-auto">
+                    <div className="flex items-center gap-3 ml-auto">
                         <AnimatePresence>
                             {stats && (
                                 <motion.div
-                                    initial={{ opacity: 0, x: 20 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    exit={{ opacity: 0, x: 20 }}
-                                    className="flex bg-black border-2 border-zinc-700 rounded-xl overflow-hidden p-1 shadow-lg"
+                                    initial={{ opacity: 0, scale: 0.95 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    exit={{ opacity: 0, scale: 0.95 }}
+                                    className="flex bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-lg p-0.5"
                                 >
-                                    <motion.button
-                                        whileHover={{ backgroundColor: '#22c55e', color: '#fff' }}
+                                    <button
                                         onClick={handleExportReport}
                                         disabled={isExporting || !file}
-                                        className="p-3 text-zinc-400 transition-all rounded-lg"
-                                        title="Download Word"
+                                        className="p-2 text-slate-400 hover:text-indigo-600 transition-all rounded"
+                                        title="Export Word Report"
                                     >
-                                        <Download size={22} />
-                                    </motion.button>
-                                    <motion.button
-                                        whileHover={{ backgroundColor: '#22c55e', color: '#fff' }}
+                                        <Download size={18} />
+                                    </button>
+                                    <button
                                         onClick={handleExportCSV}
                                         disabled={isExportingCSV || !file}
-                                        className="p-3 text-zinc-400 transition-all rounded-lg"
-                                        title="Download CSV"
+                                        className="p-2 text-slate-400 hover:text-indigo-600 transition-all rounded"
+                                        title="Export Filtered CSV"
                                     >
-                                        <FileText size={22} />
-                                    </motion.button>
+                                        <FileText size={18} />
+                                    </button>
                                 </motion.div>
                             )}
                         </AnimatePresence>
 
-                        <motion.button
-                            whileHover={{ scale: 1.05, backgroundColor: '#22c55e' }}
-                            whileTap={{ scale: 0.95 }}
+                        <button
                             onClick={handleAnalyze}
                             disabled={isLoading || !file}
-                            className={`flex items-center gap-3 px-10 py-4 rounded-xl text-sm font-black uppercase tracking-widest transition-all shadow-2xl border-2 ${isLoading
-                                    ? 'bg-zinc-800 text-zinc-500 border-zinc-700 cursor-not-allowed'
-                                    : 'bg-green-700 text-white border-green-500 shadow-green-900/40'
+                            className={`flex items-center gap-2 px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${isLoading
+                                ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
+                                : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm border border-indigo-700'
                                 }`}
                         >
-                            <RefreshCw size={20} className={isLoading ? 'animate-spin' : ''} />
-                            {isLoading ? 'ANALYZING...' : (stats ? 'REFRESH' : 'ANALYZE NOW')}
-                        </motion.button>
+                            <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
+                            {isLoading ? 'Processing' : (stats ? 'Re-Analyze' : 'Run Diagnostics')}
+                        </button>
                     </div>
                 </div>
             </div>
 
             {/* Content Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
-                {/* Stats Cards Column */}
-                <div className="grid grid-cols-1 gap-6 lg:col-span-1">
-                    {[
-                        { title: 'CAMPAIGN SIZE', value: stats?.total_sent_unique, icon: Mail, color: 'border-green-500 text-green-500', label: 'UNIQUE RECIPIENTS' },
-                        { title: 'SECURITY HITS', value: stats?.total_matches, icon: Fingerprint, color: 'border-red-500 text-red-500', label: `DETAILS > ${minLength} CHARS` },
-                        { title: 'MATCH VELOCITY', value: `${stats && stats.total_sent_unique > 0 ? ((stats.total_matches / stats.total_sent_unique) * 100).toFixed(1) : 0}%`, icon: Layers, color: 'border-orange-500 text-orange-500', label: 'HIT PERCENTAGE' }
-                    ].map((card, i) => (
-                        <motion.div
-                            key={card.title}
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: i * 0.1 }}
-                        >
-                            <Card className={`bg-black border-4 ${card.color.split(' ')[0]} shadow-[0_0_20px_rgba(0,0,0,0.8)] h-full`}>
-                                <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                                    <CardTitle className="text-xs font-black uppercase tracking-[0.2em]">{card.title}</CardTitle>
-                                    <card.icon size={24} className={card.color.split(' ')[1]} />
-                                </CardHeader>
-                                <CardContent>
-                                    <div className={`text-5xl font-black tracking-tighter mb-1 ${card.color.split(' ')[1]}`}>{card.value || 0}</div>
-                                    <p className="text-xs font-black text-zinc-500 uppercase tracking-widest">{card.label}</p>
-                                </CardContent>
-                            </Card>
-                        </motion.div>
-                    ))}
-                </div>
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mt-8">
+                {/* Key Metrics */}
+                {[
+                    { title: 'Total Sent', value: stats?.total_sent_unique, icon: Mail, color: 'text-indigo-600 bg-indigo-50 dark:bg-indigo-900/20' },
+                    { title: 'Security Matches', value: stats?.total_matches, icon: Fingerprint, color: 'text-slate-900 dark:text-slate-100 bg-slate-50 dark:bg-slate-900/20' },
+                    { title: 'Confidence Score', value: `${stats && stats.total_sent_unique > 0 ? ((stats.total_matches / stats.total_sent_unique) * 100).toFixed(1) : 0}%`, icon: CheckCircle2, color: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20' },
+                    { title: 'Data Coverage', value: stats?.unique_matches, icon: Layers, color: 'text-amber-600 bg-amber-50 dark:bg-amber-900/20' }
+                ].map((card, i) => (
+                    <Card key={i} className="bg-white dark:bg-zinc-950 border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden border-b-2">
+                        <CardContent className="p-6">
+                            <div className="flex justify-between items-start mb-4">
+                                <div className={`p-2 rounded-lg ${card.color.split(' ')[1]}`}>
+                                    <card.icon size={18} className={card.color.split(' ')[0]} />
+                                </div>
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">{card.title}</span>
+                            </div>
+                            <div className="text-3xl font-semibold text-slate-900 dark:text-slate-50 tabular-nums leading-none mb-1">
+                                {card.value || 0}
+                            </div>
+                            <div className="h-1 w-full bg-slate-100 dark:bg-slate-900 mt-4 rounded-full overflow-hidden">
+                                <motion.div
+                                    initial={{ width: 0 }}
+                                    animate={{ width: '70%' }}
+                                    className={`h-full ${card.color.split(' ')[1].replace('bg-', 'bg-').split('/')[0]}`}
+                                />
+                            </div>
+                        </CardContent>
+                    </Card>
+                ))}
+            </div>
 
-                {/* Analytics Graphics Column */}
-                <div className="lg:col-span-2 space-y-8">
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: 0.3 }}
-                    >
-                        <Card className="bg-black border-4 border-zinc-800 shadow-2xl overflow-hidden">
-                            <CardHeader className="border-b-4 border-zinc-900 pb-4 bg-zinc-950">
-                                <div className="flex items-center gap-3 text-white">
-                                    <PieIcon size={24} className="text-orange-500" />
-                                    <CardTitle className="text-sm font-black uppercase tracking-[0.2em]">HIT DISTRIBUTION</CardTitle>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="p-8">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-                                    <div className="h-[280px] relative">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <PieChart>
-                                                <Pie
-                                                    data={pieData}
-                                                    cx="50%"
-                                                    cy="50%"
-                                                    innerRadius={70}
-                                                    outerRadius={100}
-                                                    paddingAngle={10}
-                                                    dataKey="value"
-                                                    stroke="#000"
-                                                    strokeWidth={4}
-                                                >
-                                                    <Cell fill="#ef4444" /> {/* Red for Matched */}
-                                                    <Cell fill="#f97316" /> {/* Orange for Unmatched */}
-                                                </Pie>
-                                                <Tooltip
-                                                    contentStyle={{ backgroundColor: '#000', border: '2px solid #3f3f46', borderRadius: '0px', color: '#fff', fontSize: '12px', fontWeight: '900' }}
-                                                />
-                                            </PieChart>
-                                        </ResponsiveContainer>
-                                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                            <span className="text-4xl font-black text-white">{stats && stats.total_sent_unique > 0 ? ((stats.unique_matches / stats.total_sent_unique) * 100).toFixed(0) : 0}%</span>
-                                            <span className="text-xs font-extrabold text-red-500 uppercase tracking-widest">MATCHED</span>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-6">
-                                        <div className="p-6 rounded-none border-l-8 border-red-600 bg-zinc-950">
-                                            <div className="flex items-center gap-3 mb-2">
-                                                <CheckCircle2 size={20} className="text-red-500" />
-                                                <span className="text-xs font-black uppercase text-white">SECURITY HITS</span>
-                                            </div>
-                                            <p className="text-4xl font-black text-white">{stats?.unique_matches || 0}</p>
-                                        </div>
-                                        <div className="p-6 rounded-none border-l-8 border-orange-600 bg-zinc-950">
-                                            <div className="flex items-center gap-3 mb-2">
-                                                <AlertCircle size={20} className="text-orange-500" />
-                                                <span className="text-xs font-black uppercase text-white">SILENT BASELINE</span>
-                                            </div>
-                                            <p className="text-4xl font-black text-white">{Math.max(0, (stats?.total_sent_unique || 0) - (stats?.unique_matches || 0))}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </motion.div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                {/* Line Analytics */}
+                <Card className="bg-white dark:bg-zinc-950 border-slate-200 dark:border-slate-800 shadow-sm">
+                    <CardHeader className="border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between py-4">
+                        <div className="flex items-center gap-2">
+                            <PieIcon size={16} className="text-indigo-600" />
+                            <CardTitle className="text-xs font-bold uppercase tracking-widest text-slate-400">Match Trend Distribution</CardTitle>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="h-[320px] pt-8">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                                <defs>
+                                    <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.1} />
+                                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                <XAxis
+                                    dataKey="name"
+                                    axisLine={false}
+                                    tickLine={false}
+                                    tick={{ fill: '#64748b', fontSize: 10, fontWeight: 'bold' }}
+                                />
+                                <YAxis
+                                    axisLine={false}
+                                    tickLine={false}
+                                    tick={{ fill: '#64748b', fontSize: 10, fontWeight: 'bold' }}
+                                />
+                                <Tooltip
+                                    contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                />
+                                <Area type="monotone" dataKey="value" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorValue)" />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </CardContent>
+                </Card>
 
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: 0.4 }}
-                    >
-                        <Card className="bg-black border-4 border-zinc-800 shadow-2xl overflow-hidden">
-                            <CardHeader className="border-b-4 border-zinc-900 pb-4 bg-zinc-950">
-                                <div className="flex items-center gap-3 text-white">
-                                    <Layers size={24} className="text-green-500" />
-                                    <CardTitle className="text-sm font-black uppercase tracking-[0.2em]">COMPARISON SCALE</CardTitle>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="h-[300px] p-8">
+                {/* Distribution Analysis */}
+                <Card className="bg-white dark:bg-zinc-950 border-slate-200 dark:border-slate-800 shadow-sm">
+                    <CardHeader className="border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between py-4">
+                        <div className="flex items-center gap-2">
+                            <Layers size={16} className="text-indigo-600" />
+                            <CardTitle className="text-xs font-bold uppercase tracking-widest text-slate-400">Baseline Reconciliation</CardTitle>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="h-[320px] p-6">
+                        <div className="grid grid-cols-2 h-full items-center">
+                            <div className="h-full relative">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                                        <CartesianGrid strokeDasharray="0" vertical={false} stroke="#27272a" />
-                                        <XAxis
-                                            dataKey="name"
-                                            axisLine={{ stroke: '#3f3f46', strokeWidth: 2 }}
-                                            tickLine={false}
-                                            tick={{ fill: '#fff', fontSize: 12, fontWeight: '900' }}
-                                        />
-                                        <YAxis
-                                            axisLine={{ stroke: '#3f3f46', strokeWidth: 2 }}
-                                            tickLine={false}
-                                            tick={{ fill: '#fff', fontSize: 12, fontWeight: '900' }}
-                                        />
-                                        <Tooltip
-                                            contentStyle={{ backgroundColor: '#000', border: '2px solid #3f3f46', borderRadius: '0px', color: '#fff' }}
-                                        />
-                                        <Bar dataKey="value" strokeWidth={0} />
-                                    </BarChart>
+                                    <PieChart>
+                                        <Pie
+                                            data={pieData}
+                                            cx="50%"
+                                            cy="50%"
+                                            innerRadius={65}
+                                            outerRadius={90}
+                                            paddingAngle={5}
+                                            dataKey="value"
+                                            stroke="none"
+                                        >
+                                            {pieData.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip />
+                                    </PieChart>
                                 </ResponsiveContainer>
-                            </CardContent>
-                        </Card>
-                    </motion.div>
-                </div>
+                                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                    <span className="text-2xl font-bold text-slate-900 dark:text-white leading-none">
+                                        {stats && stats.total_sent_unique > 0 ? ((stats.unique_matches / stats.total_sent_unique) * 100).toFixed(0) : 0}%
+                                    </span>
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase">Coverage</span>
+                                </div>
+                            </div>
+                            <div className="space-y-4 pl-6">
+                                {[
+                                    { label: 'Identified Match', value: stats?.unique_matches, sub: 'Found in logs', color: 'bg-indigo-600' },
+                                    { label: 'Unresolved', value: Math.max(0, (stats?.total_sent_unique || 0) - (stats?.unique_matches || 0)), sub: 'No activity found', color: 'bg-slate-200' }
+                                ].map((item, i) => (
+                                    <div key={i} className="flex items-center gap-4">
+                                        <div className={`w-1 h-10 rounded-full ${item.color}`} />
+                                        <div>
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{item.label}</p>
+                                            <p className="text-lg font-bold text-slate-900 dark:text-slate-100">{item.value || 0}</p>
+                                            <p className="text-[10px] text-slate-500 font-medium">{item.sub}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
             </div>
 
             {/* Results Table Section */}
             {matches.length > 0 && (
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.5 }}
-                >
-                    <Card className="bg-black border-4 border-zinc-800 shadow-2xl overflow-hidden mt-8">
-                        <CardHeader className="flex flex-row items-center justify-between border-b-4 border-zinc-900 pb-4 bg-zinc-950">
-                            <CardTitle className="text-sm font-black uppercase tracking-[0.2em] text-white">DETAILED MATCH MANIFEST</CardTitle>
-                            <div className="flex items-center gap-4">
-                                <span className="text-xs font-black text-green-500 bg-green-900/20 px-4 py-1.5 border border-green-800">{matches.length} MATCHES</span>
-                                <button
-                                    onClick={() => setShowCleaned(!showCleaned)}
-                                    className={`px-6 py-2 rounded-none text-xs font-black uppercase tracking-widest transition-all border-2 ${showCleaned ? 'bg-orange-600 text-white border-orange-500' : 'bg-black text-zinc-400 border-zinc-700 hover:border-white hover:text-white'
-                                        }`}
-                                >
-                                    {showCleaned ? 'STANDARD VIEW' : 'RAW DETAILS'}
-                                </button>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="p-0">
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left">
-                                    <thead>
-                                        <tr className="bg-zinc-950 border-b-2 border-zinc-900">
-                                            <th className="px-6 py-4 text-xs font-black text-zinc-500 uppercase tracking-widest">TARGET EMAIL</th>
-                                            <th className="px-6 py-4 text-xs font-black text-zinc-500 uppercase tracking-widest">CAMPAIGN DATE</th>
-                                            <th className="px-6 py-4 text-xs font-black text-zinc-500 uppercase tracking-widest">HIT TIMESTAMP</th>
-                                            <th className="px-6 py-4 text-xs font-black text-zinc-500 uppercase tracking-widest">ACTIVITY TRACE</th>
+                <Card className="bg-white dark:bg-zinc-950 border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden mt-8">
+                    <CardHeader className="flex flex-row items-center justify-between border-b border-slate-100 dark:border-slate-800 py-6 px-8">
+                        <div className="flex items-center gap-2">
+                            <FileText size={18} className="text-indigo-600" />
+                            <CardTitle className="text-sm font-black uppercase tracking-widest text-slate-400">Diagnostic Audit Log</CardTitle>
+                        </div>
+                        <div className="flex items-center gap-4">
+                            <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 dark:bg-indigo-900/40 px-3 py-1 rounded border border-indigo-100 dark:border-indigo-900">{matches.length} IDENTIFIED RECORDS</span>
+                            <button
+                                onClick={() => setShowCleaned(!showCleaned)}
+                                className={`px-4 py-2 rounded text-[10px] font-black uppercase tracking-widest transition-all border ${showCleaned ? 'bg-indigo-600 text-white border-indigo-700' : 'bg-white dark:bg-zinc-900 text-slate-500 border-slate-200 dark:border-slate-700 hover:border-indigo-600'
+                                    }`}
+                            >
+                                {showCleaned ? 'Raw Input' : 'Clean Input'}
+                            </button>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800">
+                                        <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Subscriber Identity</th>
+                                        <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Reconciliation Data</th>
+                                        <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">System Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                    {matches.map((match, idx) => (
+                                        <tr key={match.id + idx} className="hover:bg-slate-50/30 dark:hover:bg-slate-900/30 transition-colors">
+                                            <td className="px-8 py-6">
+                                                <div className="flex flex-col">
+                                                    <span className="text-sm font-semibold text-slate-900 dark:text-slate-100 tracking-tight">{match.email}</span>
+                                                    <span className="text-[10px] text-slate-400 font-medium">Record ID: {match.id.substring(0, 8)}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-8 py-6">
+                                                <div className="space-y-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[10px] font-bold text-slate-400 uppercase w-20">Sent On:</span>
+                                                        <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">{match.sent_at || 'Unrecorded'}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[10px] font-bold text-slate-400 uppercase w-20">Matched:</span>
+                                                        <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400">{format(new Date(match.security_date), 'MMM dd, HH:mm')}</span>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-8 py-6">
+                                                <div className="max-w-xl">
+                                                    <div className="text-[11px] leading-relaxed text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/30 p-3 rounded border border-slate-100 dark:border-slate-800 font-mono">
+                                                        {showCleaned ? match.cleaned_details : match.input_details}
+                                                    </div>
+                                                </div>
+                                            </td>
                                         </tr>
-                                    </thead>
-                                    <tbody className="divide-y-2 divide-zinc-900">
-                                        {matches.map((match, idx) => (
-                                            <motion.tr
-                                                key={match.id + idx}
-                                                className="bg-black hover:bg-zinc-900 transition-colors"
-                                            >
-                                                <td className="px-6 py-4">
-                                                    <div className="flex flex-col">
-                                                        <span className="text-sm font-black text-white uppercase tracking-tight">{match.email}</span>
-                                                        <span className="text-[10px] font-bold text-green-500">VERIFIED HIT</span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4 text-xs font-mono font-black text-white">{match.sent_at || '-'}</td>
-                                                <td className="px-6 py-4 text-xs font-mono font-black text-orange-500">
-                                                    {format(new Date(match.security_date), 'yyyy-MM-dd HH:mm:ss')}
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="max-w-md">
-                                                        <p className="text-xs font-mono leading-relaxed text-zinc-300 bg-black p-4 border-2 border-zinc-800 max-h-32 overflow-y-auto">
-                                                            {showCleaned ? match.cleaned_details : match.input_details}
-                                                        </p>
-                                                    </div>
-                                                </td>
-                                            </motion.tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </motion.div>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </CardContent>
+                </Card>
             )}
         </motion.div>
     );
