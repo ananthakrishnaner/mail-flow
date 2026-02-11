@@ -13,6 +13,7 @@ interface ComparisonMatch {
     sent_at: string;
     security_date: string;
     input_details: string;
+    cleaned_details: string;
 }
 
 interface ComparisonStats {
@@ -26,6 +27,9 @@ export const ComparisonAnalyser = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [file, setFile] = useState<File | null>(null);
     const [isExporting, setIsExporting] = useState(false);
+    const [isExportingCSV, setIsExportingCSV] = useState(false);
+    const [minLength, setMinLength] = useState(2);
+    const [showCleaned, setShowCleaned] = useState(false);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -42,6 +46,7 @@ export const ComparisonAnalyser = () => {
         setIsLoading(true);
         const formData = new FormData();
         formData.append('file', file);
+        formData.append('min_length', minLength.toString());
 
         try {
             const res = await api.post('/comparison/analytics', formData, {
@@ -61,7 +66,7 @@ export const ComparisonAnalyser = () => {
     };
 
     const handleDownloadSample = () => {
-        const csvContent = "data:text/csv;charset=utf-8," + "email,sent_at\nexample@test.com,2024-01-01 10:00:00\nanother@test.com,2024-01-02 11:30:00";
+        const csvContent = "data:text/csv;charset=utf-8," + "email,sent_at,date\nexample@test.com,2024-01-01 10:00:00,2024-01-01\nanother@test.com,2024-01-02 11:30:00,2024-01-02";
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
@@ -80,10 +85,9 @@ export const ComparisonAnalyser = () => {
         setIsExporting(true);
         const formData = new FormData();
         formData.append('file', file);
+        formData.append('min_length', minLength.toString());
 
         try {
-            // We can't use api.post for blob response easily with the interceptor setup sometimes, 
-            // but let's try standard fetch for blob download to be safe or use axios with responseType
             const response = await api.post('/comparison/export', formData, {
                 responseType: 'blob',
                 headers: {
@@ -91,7 +95,6 @@ export const ComparisonAnalyser = () => {
                 }
             });
 
-            // Create download link
             const url = window.URL.createObjectURL(new Blob([response.data]));
             const link = document.createElement('a');
             link.href = url;
@@ -105,6 +108,41 @@ export const ComparisonAnalyser = () => {
             toast.error("Failed to export report");
         } finally {
             setIsExporting(false);
+        }
+    };
+
+    const handleExportCSV = async () => {
+        if (!file) {
+            toast.error("Please upload a CSV file to generate the report.");
+            return;
+        }
+
+        setIsExportingCSV(true);
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('min_length', minLength.toString());
+
+        try {
+            const response = await api.post('/comparison/export-csv', formData, {
+                responseType: 'blob',
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                }
+            });
+
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', 'comparison_analysis.csv');
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            toast.success("CSV exported successfully");
+        } catch (error) {
+            console.error('CSV Export failed', error);
+            toast.error("Failed to export CSV");
+        } finally {
+            setIsExportingCSV(false);
         }
     };
 
@@ -130,7 +168,7 @@ export const ComparisonAnalyser = () => {
                         Comparison Analyser
                     </h2>
                     <p className="text-muted-foreground text-sm mt-1">
-                        Upload Sent Campaign CSV to compare against Security Logs (Matches {'>'} 2 chars)
+                        Upload Sent Campaign CSV to compare against Security Logs
                     </p>
                 </div>
                 <div className="flex flex-wrap gap-3">
@@ -164,6 +202,18 @@ export const ComparisonAnalyser = () => {
                         </button>
                     )}
 
+                    <div className="flex items-center gap-2 px-3 py-2 bg-zinc-900 border border-border rounded-lg">
+                        <span className="text-xs text-muted-foreground">Min Length:</span>
+                        <input
+                            type="number"
+                            min="0"
+                            max="50"
+                            className="w-12 bg-transparent border-none text-xs focus:ring-0 p-0 text-center"
+                            value={minLength}
+                            onChange={(e) => setMinLength(parseInt(e.target.value) || 0)}
+                        />
+                    </div>
+
                     <button
                         onClick={handleAnalyze}
                         disabled={isLoading || !file}
@@ -173,14 +223,26 @@ export const ComparisonAnalyser = () => {
                         {stats ? 'Re-Compare' : 'Analyze'}
                     </button>
 
-                    <button
-                        onClick={handleExportReport}
-                        disabled={isExporting || !file}
-                        className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors shadow-lg hover:shadow-purple-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        <Download size={16} className={isExporting ? 'animate-pulse' : ''} />
-                        {isExporting ? 'Generating...' : 'Report (Word)'}
-                    </button>
+                    <div className="flex gap-1">
+                        <button
+                            onClick={handleExportReport}
+                            disabled={isExporting || !file}
+                            className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-l-lg transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed border-r border-white/10"
+                            title="Export Word Report"
+                        >
+                            <Download size={16} className={isExporting ? 'animate-pulse' : ''} />
+                            {isExporting ? '...' : 'RTF'}
+                        </button>
+                        <button
+                            onClick={handleExportCSV}
+                            disabled={isExportingCSV || !file}
+                            className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-r-lg transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Export CSV Data"
+                        >
+                            <FileText size={16} className={isExportingCSV ? 'animate-pulse' : ''} />
+                            {isExportingCSV ? '...' : 'CSV'}
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -206,7 +268,7 @@ export const ComparisonAnalyser = () => {
                         </CardHeader>
                         <CardContent>
                             <div className="text-2xl font-bold text-red-500">{stats?.total_matches_unique || 0}</div>
-                            <p className="text-xs text-muted-foreground mt-1">Matched logs with details {'>'} 2 chars</p>
+                            <p className="text-xs text-muted-foreground mt-1">Matched logs with details {'>'}= {minLength} chars</p>
                         </CardContent>
                     </Card>
 
@@ -255,8 +317,14 @@ export const ComparisonAnalyser = () => {
 
             {/* Comparison Table */}
             <Card className="bg-card border-border overflow-hidden">
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle>Matched Details</CardTitle>
+                    <button
+                        onClick={() => setShowCleaned(!showCleaned)}
+                        className={`text-xs px-3 py-1 rounded-full border transition-all ${showCleaned ? 'bg-blue-600/10 border-blue-500 text-blue-400' : 'bg-muted border-border text-muted-foreground'}`}
+                    >
+                        {showCleaned ? 'Standard Format' : 'Clean Format'}
+                    </button>
                 </CardHeader>
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm">
@@ -285,8 +353,8 @@ export const ComparisonAnalyser = () => {
                                         <td className="p-4 text-muted-foreground">
                                             {match.security_date ? format(new Date(match.security_date), 'MMM dd, yyyy HH:mm') : '-'}
                                         </td>
-                                        <td className="p-4 font-mono text-xs max-w-[300px] truncate" title={match.input_details}>
-                                            {match.input_details || '-'}
+                                        <td className="p-4 font-mono text-xs max-w-[300px] break-all">
+                                            {showCleaned ? (match.cleaned_details || '-') : (match.input_details || '-')}
                                         </td>
                                     </tr>
                                 ))
