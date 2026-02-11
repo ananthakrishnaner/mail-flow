@@ -92,7 +92,8 @@ def get_comparison_data(file, min_length=2, unique_only=False):
 
         stats = {
             'total_sent_unique': len(csv_emails),
-            'total_matches_unique': len(unique_matched_emails)
+            'unique_matches': len(unique_matched_emails),
+            'total_matches': len(matches)
         }
         
         return matches, stats, len(csv_emails), None

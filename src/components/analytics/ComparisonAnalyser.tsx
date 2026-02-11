@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Download, Fingerprint, Mail, RefreshCw, Layers, Upload, FileText } from 'lucide-react';
+import { Download, Fingerprint, Mail, RefreshCw, Layers, Upload, FileText, UserCheck } from 'lucide-react';
 import api, { API_URL } from '@/lib/api';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -18,7 +18,8 @@ interface ComparisonMatch {
 
 interface ComparisonStats {
     total_sent_unique: number;
-    total_matches_unique: number;
+    unique_matches: number;
+    total_matches: number;
 }
 
 export const ComparisonAnalyser = () => {
@@ -161,7 +162,7 @@ export const ComparisonAnalyser = () => {
 
     const chartData = stats ? [
         { name: 'CSV Emails', value: stats.total_sent_unique, fill: '#0ea5e9' },
-        { name: 'Security Matches', value: stats.total_matches_unique, fill: '#ef4444' }
+        { name: 'Security Matches', value: stats.total_matches, fill: '#ef4444' }
     ] : [];
 
     return (
@@ -175,85 +176,97 @@ export const ComparisonAnalyser = () => {
                         Upload Sent Campaign CSV to compare against Security Logs
                     </p>
                 </div>
-                <div className="flex flex-wrap gap-3">
-                    <button
-                        onClick={handleDownloadSample}
-                        className="flex items-center gap-2 px-3 py-2 text-xs bg-muted border border-border rounded-lg hover:bg-muted/80 transition-colors"
-                    >
-                        <FileText size={14} /> Download Sample CSV
-                    </button>
+                <div className="flex flex-wrap gap-4 items-center">
+                    {/* Input Group */}
+                    <div className="flex items-center gap-2 p-1.5 bg-zinc-900/50 border border-border rounded-xl shadow-inner">
+                        <button
+                            onClick={handleDownloadSample}
+                            className="p-1.5 text-zinc-500 hover:text-zinc-300 transition-colors"
+                            title="Download Sample CSV"
+                        >
+                            <FileText size={16} />
+                        </button>
+                        <div className="h-4 w-px bg-border" />
+                        <div className="relative">
+                            <input
+                                id="csv-upload"
+                                type="file"
+                                accept=".csv"
+                                onChange={handleFileChange}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            />
+                            <button className={`flex items-center gap-2 px-4 py-1.5 text-sm rounded-lg transition-all ${file ? 'bg-primary/20 text-primary border border-primary/20 font-medium' : 'bg-transparent text-zinc-400 hover:text-white'}`}>
+                                <Upload size={14} />
+                                <span className="max-w-[120px] truncate">{file ? file.name : 'Upload CSV'}</span>
+                            </button>
+                        </div>
+                        {file && (
+                            <button
+                                onClick={handleReset}
+                                className="p-1.5 text-zinc-500 hover:text-destructive transition-colors ml-1"
+                                title="Clear file"
+                            >
+                                <RefreshCw size={14} />
+                            </button>
+                        )}
+                    </div>
 
-                    <div className="relative">
-                        <input
-                            id="csv-upload"
-                            type="file"
-                            accept=".csv"
-                            onChange={handleFileChange}
-                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                        />
-                        <button className={`flex items-center gap-2 px-4 py-2 border border-border rounded-lg transition-colors ${file ? 'bg-primary/10 border-primary text-primary' : 'bg-card hover:bg-muted'}`}>
-                            <Upload size={16} />
-                            {file ? file.name : 'Upload CSV'}
+                    {/* Settings Group */}
+                    <div className="flex items-center gap-3 px-3 py-1.5 bg-zinc-900/50 border border-border rounded-xl shadow-inner">
+                        <div className="flex items-center gap-2 border-r border-border pr-3">
+                            <span className="text-[10px] uppercase tracking-wider font-bold text-zinc-500">Min Len:</span>
+                            <input
+                                type="number"
+                                min="0"
+                                max="50"
+                                className="w-8 bg-transparent border-none text-xs focus:ring-0 p-0 text-center font-mono text-white"
+                                value={minLength}
+                                onChange={(e) => setMinLength(parseInt(e.target.value) || 0)}
+                            />
+                        </div>
+                        <button
+                            onClick={() => setUniqueOnly(!uniqueOnly)}
+                            className={`flex items-center gap-2 text-xs font-bold uppercase tracking-tight transition-all py-1.5 px-3 rounded-lg border ${uniqueOnly
+                                ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.1)]'
+                                : 'text-zinc-500 border-transparent hover:text-zinc-300 hover:bg-zinc-800'
+                                }`}
+                        >
+                            <UserCheck size={14} className={uniqueOnly ? 'opacity-100' : 'opacity-40'} />
+                            {uniqueOnly ? 'Unique: On' : 'Unique: Off'}
                         </button>
                     </div>
 
-                    {file && (
+                    {/* Action Group */}
+                    <div className="flex items-center gap-2 flex-grow justify-end">
                         <button
-                            onClick={handleReset}
-                            className="flex items-center gap-2 px-4 py-2 bg-destructive/10 text-destructive hover:bg-destructive/20 border border-destructive/20 rounded-lg transition-colors"
+                            onClick={handleAnalyze}
+                            disabled={isLoading || !file}
+                            className="flex items-center gap-2 px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold rounded-xl transition-all shadow-[0_4px_12px_rgba(37,99,235,0.3)] disabled:opacity-50 disabled:shadow-none hover:translate-y-[-1px] active:translate-y-[1px]"
                         >
-                            Reset
+                            <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
+                            {stats ? 'Re-Compare' : 'Analyze Now'}
                         </button>
-                    )}
 
-                    <div className="flex items-center gap-2 px-3 py-2 bg-zinc-900 border border-border rounded-lg">
-                        <span className="text-xs text-muted-foreground">Min Length:</span>
-                        <input
-                            type="number"
-                            min="0"
-                            max="50"
-                            className="w-12 bg-transparent border-none text-xs focus:ring-0 p-0 text-center"
-                            value={minLength}
-                            onChange={(e) => setMinLength(parseInt(e.target.value) || 0)}
-                        />
-                    </div>
+                        <div className="h-8 w-px bg-border mx-2" />
 
-                    <button
-                        onClick={() => setUniqueOnly(!uniqueOnly)}
-                        className={`flex items-center gap-2 px-3 py-2 text-xs border rounded-lg transition-all ${uniqueOnly ? 'bg-indigo-600/10 border-indigo-500 text-indigo-400' : 'bg-zinc-900 border-border text-muted-foreground hover:text-white'}`}
-                        title="Show only most recent log for each email"
-                    >
-                        {uniqueOnly ? 'Unique Emails: ON' : 'Unique Emails: OFF'}
-                    </button>
-
-                    <button
-                        onClick={handleAnalyze}
-                        disabled={isLoading || !file}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
-                        {stats ? 'Re-Compare' : 'Analyze'}
-                    </button>
-
-                    <div className="flex gap-1">
-                        <button
-                            onClick={handleExportReport}
-                            disabled={isExporting || !file}
-                            className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-l-lg transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed border-r border-white/10"
-                            title="Export Word Report"
-                        >
-                            <Download size={16} className={isExporting ? 'animate-pulse' : ''} />
-                            {isExporting ? '...' : 'RTF'}
-                        </button>
-                        <button
-                            onClick={handleExportCSV}
-                            disabled={isExportingCSV || !file}
-                            className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-r-lg transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                            title="Export CSV Data"
-                        >
-                            <FileText size={16} className={isExportingCSV ? 'animate-pulse' : ''} />
-                            {isExportingCSV ? '...' : 'CSV'}
-                        </button>
+                        <div className="flex bg-zinc-900/50 border border-border rounded-xl overflow-hidden p-0.5 shadow-inner">
+                            <button
+                                onClick={handleExportReport}
+                                disabled={isExporting || !file}
+                                className="p-2 text-zinc-400 hover:text-purple-400 hover:bg-purple-500/10 transition-all rounded-lg"
+                                title="Export Word"
+                            >
+                                <Download size={16} />
+                            </button>
+                            <button
+                                onClick={handleExportCSV}
+                                disabled={isExportingCSV || !file}
+                                className="p-2 text-zinc-400 hover:text-purple-400 hover:bg-purple-500/10 transition-all rounded-lg"
+                                title="Export CSV"
+                            >
+                                <FileText size={16} />
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -279,7 +292,7 @@ export const ComparisonAnalyser = () => {
                             <Fingerprint className="h-4 w-4 text-red-500" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold text-red-500">{stats?.total_matches_unique || 0}</div>
+                            <div className="text-2xl font-bold text-red-500">{stats?.total_matches || 0}</div>
                             <p className="text-xs text-muted-foreground mt-1">Matched logs with details {'>'}= {minLength} chars</p>
                         </CardContent>
                     </Card>
@@ -292,7 +305,7 @@ export const ComparisonAnalyser = () => {
                         <CardContent>
                             <div className="text-2xl font-bold text-purple-500">
                                 {stats && stats.total_sent_unique > 0
-                                    ? ((stats.total_matches_unique / stats.total_sent_unique) * 100).toFixed(1)
+                                    ? ((stats.total_matches / stats.total_sent_unique) * 100).toFixed(1)
                                     : 0}%
                             </div>
                             <p className="text-xs text-muted-foreground mt-1">CSV to Security Log ratio</p>
