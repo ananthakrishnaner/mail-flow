@@ -8,7 +8,7 @@ import csv
 import io
 import json
 
-def get_comparison_data(file, min_length=2):
+def get_comparison_data(file, min_length=2, unique_only=False):
     """
     Helper to parse CSV and find matches in SecurityLog.
     Returns (matches, stats, csv_emails_count, error_msg)
@@ -63,6 +63,10 @@ def get_comparison_data(file, min_length=2):
             email_lower = slog.email.lower()
             
             if email_lower in csv_emails:
+                # If unique_only is requested, skip if we already found a match for this email
+                if unique_only and email_lower in unique_matched_emails:
+                    continue
+
                 # Filter: input_details length >= min_length
                 details = slog.input_details or ''
                 if len(details) >= min_length:
@@ -102,8 +106,9 @@ class ComparisonAnalyticsView(APIView):
             return Response({'error': 'No file uploaded'}, status=400)
 
         min_length = int(request.data.get('min_length', 2))
+        unique_only = request.data.get('unique_only', 'false').lower() == 'true'
         
-        matches, stats, _, error = get_comparison_data(file, min_length)
+        matches, stats, _, error = get_comparison_data(file, min_length, unique_only)
         if error:
             return Response({'error': error}, status=400 if 'column' in error else 500)
 
@@ -124,7 +129,8 @@ class ComparisonExportView(APIView):
                 return Response({'error': 'No file uploaded'}, status=400)
 
             min_length = int(request.data.get('min_length', 2))
-            matches, stats, total_emails, error = get_comparison_data(file, min_length)
+            unique_only = request.data.get('unique_only', 'false').lower() == 'true'
+            matches, stats, total_emails, error = get_comparison_data(file, min_length, unique_only)
             
             if error:
                 return Response({'error': error}, status=400 if 'column' in error else 500)
@@ -203,7 +209,8 @@ class ComparisonCSVExportView(APIView):
                 return Response({'error': 'No file uploaded'}, status=400)
 
             min_length = int(request.data.get('min_length', 2))
-            matches, stats, total_emails, error = get_comparison_data(file, min_length)
+            unique_only = request.data.get('unique_only', 'false').lower() == 'true'
+            matches, stats, total_emails, error = get_comparison_data(file, min_length, unique_only)
             
             if error:
                 return Response({'error': error}, status=400 if 'column' in error else 500)

@@ -30,6 +30,7 @@ export const ComparisonAnalyser = () => {
     const [isExportingCSV, setIsExportingCSV] = useState(false);
     const [minLength, setMinLength] = useState(2);
     const [showCleaned, setShowCleaned] = useState(false);
+    const [uniqueOnly, setUniqueOnly] = useState(false);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -47,6 +48,7 @@ export const ComparisonAnalyser = () => {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('min_length', minLength.toString());
+        formData.append('unique_only', uniqueOnly.toString());
 
         try {
             const res = await api.post('/comparison/analytics', formData, {
@@ -86,6 +88,7 @@ export const ComparisonAnalyser = () => {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('min_length', minLength.toString());
+        formData.append('unique_only', uniqueOnly.toString());
 
         try {
             const response = await api.post('/comparison/export', formData, {
@@ -121,6 +124,7 @@ export const ComparisonAnalyser = () => {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('min_length', minLength.toString());
+        formData.append('unique_only', uniqueOnly.toString());
 
         try {
             const response = await api.post('/comparison/export-csv', formData, {
@@ -213,6 +217,14 @@ export const ComparisonAnalyser = () => {
                             onChange={(e) => setMinLength(parseInt(e.target.value) || 0)}
                         />
                     </div>
+
+                    <button
+                        onClick={() => setUniqueOnly(!uniqueOnly)}
+                        className={`flex items-center gap-2 px-3 py-2 text-xs border rounded-lg transition-all ${uniqueOnly ? 'bg-indigo-600/10 border-indigo-500 text-indigo-400' : 'bg-zinc-900 border-border text-muted-foreground hover:text-white'}`}
+                        title="Show only most recent log for each email"
+                    >
+                        {uniqueOnly ? 'Unique Emails: ON' : 'Unique Emails: OFF'}
+                    </button>
 
                     <button
                         onClick={handleAnalyze}
