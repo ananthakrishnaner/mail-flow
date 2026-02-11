@@ -308,7 +308,7 @@ export const ComparisonAnalyser = () => {
                 {/* Key Metrics */}
                 {[
                     { title: 'Total Sent', value: stats?.total_sent_unique, icon: Mail, color: 'text-indigo-600 bg-indigo-50 dark:bg-indigo-900/20' },
-                    { title: 'Security Matches', value: stats?.total_matches, icon: Fingerprint, color: 'text-slate-900 dark:text-slate-100 bg-slate-50 dark:bg-slate-900/20' },
+                    { title: 'Credentials Recieved', value: stats?.total_matches, icon: Fingerprint, color: 'text-slate-900 dark:text-slate-100 bg-slate-50 dark:bg-slate-900/20' },
                     { title: 'Confidence Score', value: `${stats && stats.total_sent_unique > 0 ? ((stats.total_matches / stats.total_sent_unique) * 100).toFixed(1) : 0}%`, icon: CheckCircle2, color: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20' },
                     { title: 'Data Coverage', value: stats?.unique_matches, icon: Layers, color: 'text-amber-600 bg-amber-50 dark:bg-amber-900/20' }
                 ].map((card, i) => (

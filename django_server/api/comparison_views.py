@@ -145,43 +145,94 @@ class ComparisonExportView(APIView):
             
             doc = Document()
             
-            # Title
-            title = doc.add_heading('Comparison Analyser Report', 0)
+            # Helper to add shading
+            def set_cell_shading(cell, color):
+                shading_elm = parse_xml(r'<w:shd {} w:fill="{}"/>'.format(nsdecls('w'), color))
+                cell._element.get_or_add_tcPr().append(shading_elm)
+
+            # Title & Header
+            title = doc.add_heading('Deliverability Diagnostic Report', 0)
             title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            title.runs[0].font.color.rgb = RGBColor(0, 102, 204)
+            title.runs[0].font.color.rgb = RGBColor(79, 70, 229) # Indigo
             
-            doc.add_paragraph(f"Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            meta = doc.add_paragraph()
+            meta.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            meta.add_run(f"System Reconciliation: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}").italic = True
             
-            doc.add_heading('Comparison Analysis', level=1)
-            doc.add_paragraph(f'This report compares emails from the uploaded CSV against security logs. Filter: Input details length >= {min_length}.')
+            # Executive Summary Section
+            doc.add_heading('Executive Summary', level=1)
+            doc.add_paragraph('This report provides a cross-reconciliation between external campaign reach and internal security log identifiers.')
             
-            # Table
-            table = doc.add_table(rows=1, cols=4)
+            # Stats Grid / KPI section
+            stats_table = doc.add_table(rows=2, cols=2)
+            stats_table.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            
+            confidence = (len(matches) / total_emails * 100) if total_emails > 0 else 0
+            
+            kpis = [
+                ('Campaign size', f"{total_emails} Unique Recipients"),
+                ('Security Hits', f"{len(matches)} Identified Events"),
+                ('Confidence Score', f"{confidence:.1f}% Match Velocity"),
+                ('Data Coverage', f"{stats['unique_matches']} Unique Identifiers")
+            ]
+            
+            cells = stats_table._cells
+            for i, (label, val) in enumerate(kpis):
+                cell = cells[i]
+                p = cell.paragraphs[0]
+                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                p.add_run(f"{label.upper()}\n").font.size = Pt(9)
+                p.runs[0].font.bold = True
+                p.runs[0].font.color.rgb = RGBColor(100, 116, 139) # Slate
+                p.add_run(val).font.size = Pt(14)
+                p.runs[1].font.bold = True
+                p.runs[1].font.color.rgb = RGBColor(79, 70, 229) # Indigo
+            
+            doc.add_paragraph() # Spacing
+            
+            # Diagnostic Audit Log
+            doc.add_heading('Diagnostic Audit Log', level=1)
+            doc.add_paragraph(f"Detailed list of records identified in system logs with input details >= {min_length} characters.")
+            
+            # Match Table
+            table = doc.add_table(rows=1, cols=5)
             table.style = 'Table Grid'
             
-            headers = ['Email Address', 'Email Sent Date', 'Security Log Date', 'Input Details']
+            headers = ['SL NO', 'TARGET IDENTITY', 'SENT DATE', 'LOG TIMESTAMP', 'SYSTEM DETAILS']
             hdr_cells = table.rows[0].cells
             for i, h in enumerate(headers):
-                hdr_cells[i].text = h
-                hdr_cells[i].paragraphs[0].runs[0].font.bold = True
-                hdr_cells[i].paragraphs[0].runs[0].font.color.rgb = RGBColor(255, 255, 255)
-                
-                # Header background
-                shading_elm = parse_xml(r'<w:shd {} w:fill="0066CC"/>'.format(nsdecls('w')))
-                hdr_cells[i]._element.get_or_add_tcPr().append(shading_elm)
-                
-            for m in matches:
+                cell = hdr_cells[i]
+                p = cell.paragraphs[0]
+                p.text = h
+                p.runs[0].font.bold = True
+                p.runs[0].font.size = Pt(9)
+                p.runs[0].font.color.rgb = RGBColor(255, 255, 255)
+                set_cell_shading(cell, "4F46E5") # Indigo primary
+
+            for idx, m in enumerate(matches):
                 row_cells = table.add_row().cells
-                row_cells[0].text = m['email']
-                row_cells[1].text = str(m['sent_at']) if m['sent_at'] else '-'
-                row_cells[2].text = m['security_date'].strftime('%Y-%m-%d %H:%M:%S') if m['security_date'] else '-'
-                row_cells[3].text = m['input_details'] or '-'
+                row_cells[0].text = f"{(idx + 1):02d}"
+                row_cells[0].paragraphs[0].runs[0].font.size = Pt(9)
                 
-            # Summary
+                row_cells[1].text = m['email']
+                row_cells[1].paragraphs[0].runs[0].font.bold = True
+                
+                row_cells[2].text = str(m['sent_at']) if m['sent_at'] else '-'
+                row_cells[2].paragraphs[0].runs[0].font.size = Pt(9)
+                
+                row_cells[3].text = m['security_date'].strftime('%Y-%m-%d %H:%M:%S')
+                row_cells[3].paragraphs[0].runs[0].font.size = Pt(9)
+                
+                details_p = row_cells[4].paragraphs[0]
+                details_p.text = m['input_details'] or '-'
+                details_p.runs[0].font.size = Pt(8)
+                details_p.runs[0].font.name = 'Courier New'
+
+            # Footer
             doc.add_paragraph()
-            doc.add_heading('Summary', level=2)
-            doc.add_paragraph(f"Total Unique Emails in CSV: {total_emails}")
-            doc.add_paragraph(f"Total Matches Found: {len(matches)}")
+            footer = doc.add_paragraph("End of Deliverability Diagnostic Report")
+            footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            footer.runs[0].italic = True
             
             # Save
             buffer = io.BytesIO()
@@ -192,7 +243,7 @@ class ComparisonExportView(APIView):
                 buffer.getvalue(),
                 content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
             )
-            response['Content-Disposition'] = 'attachment; filename="comparison_analysis_report.docx"'
+            response['Content-Disposition'] = f'attachment; filename="deliverability_report_{datetime.now().strftime("%Y%m%d_%H%M")}.docx"'
             return response
             
         except Exception as e:
